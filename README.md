@@ -2,11 +2,13 @@
 
 An interactive map of the research staff of the Institute of Environmental Sciences (CML), Leiden University: the Industrial Ecology and Environmental Biology departments, from professors to PhD candidates. It shows who works on what, with which methods, with whom inside CML, and with which institutions and countries outside it.
 
-Open `dashboard.html` in a browser. It is a single self-contained file (data embedded, no server, no external libraries).
+Open `dashboard.html` (or its copy `index.html`) in a browser. It is a single self-contained file (data embedded, no server, no external libraries).
+
+**Online**: GitHub Pages serves `index.html` from this repository ([CMLPlatform/CML_explorer](https://github.com/CMLPlatform/CML_explorer)). The online version has all views except **Ask**, because Ask needs the local server (`serve.py`).
 
 ## What the dashboard shows
 
-Three views, chosen at the top:
+Four views, chosen at the top:
 
 | View | What it shows |
 |---|---|
@@ -15,7 +17,7 @@ Three views, chosen at the top:
 | **Find expertise** | Type a topic (for example "critical raw materials") to rank people by how often it appears in their profile keywords, paper keywords, paper titles and bio. |
 | **Ask** | Chat with a research assistant that searches CML's papers and answers with numbered citations, naming the people behind the work. From a person's card, **Ask about their work** limits the conversation to that person. Needs `serve.py` (below). |
 
-The filters on the left (search, CML theme, department, position, harmonized tags, original keywords) apply to all three views. The URL hash stores the current view, so **Copy link** shares it.
+The filters on the left (search, CML theme, department, position, harmonized tags, original keywords) apply to all views. The URL hash stores the current view, so **Copy link** shares it.
 
 ## How it is built
 
@@ -24,7 +26,7 @@ scrape_staff.py      -> leiden_staff.json          all staff profiles: keywords,
 harvest_openalex.py  -> data/people.csv, works.jsonl, ...   OpenAlex publications per person (needs an API key)
 build_network.py     -> data/network.json, pub_texts.json   co-authorship, partners, papers per person
 harmonize.py                                        keyword canonicalisation + theme assignment (used by the build)
-build_dashboard.py   -> dashboard.html, tag_report.md, cml-network-site/index.html, data/people.json
+build_dashboard.py   -> dashboard.html, index.html, tag_report.md, data/people.json (+ cml-network-site/index.html if present)
 build_index.py       -> data/knowledge.db           searchable paper + people database for the assistant
 assistant.py, serve.py                              the assistant and a local server for dashboard + assistant
 ```
@@ -33,7 +35,8 @@ assistant.py, serve.py                              the assistant and a local se
 - **[harvest_openalex.py](harvest_openalex.py)**: matches each person to an OpenAlex author (ORCID first, otherwise name search among Leiden authors) and downloads their papers since 2010. Saves progress per person, resumes after interruptions, logs to `data/harvest.log`. Put `OPENALEX_API_KEY=...` in a `.env` file next to the script or one folder up (free key from openalex.org).
 - **[build_network.py](build_network.py)**: decides which papers count for whom (all papers for ORCID matches; only Leiden-affiliated papers for name matches, to avoid namesakes), builds the CML co-author links and the partner institutions and countries. `data/match_review.csv` lists matches worth checking.
 - **[harmonize.py](harmonize.py)**: three layers. Aliases merge keyword variants and drop generic ones; every canonical keyword maps to one or more fine-grained themes; bio text back-fills people with few keywords. Paper titles and keywords are a fourth, lower-weight layer that mostly helps PhD candidates with thin profiles. The fine themes are then scored into the five CML themes (`CML_WEIGHTS`, `CML_KEYWORDS`, `CML_TEXT`, `CML_PUB_WEIGHT`). Manual corrections live in `CML_OVERRIDES`. Keywords added for the full staff list are in a separate block for review.
-- **[build_dashboard.py](build_dashboard.py)**: merges profiles and publications, runs the theme assignment, embeds everything in [dashboard_template.html](dashboard_template.html), writes `dashboard.html`, copies it to `cml-network-site/index.html` and writes `tag_report.md` (tag quality checks, departments that were inferred, keywords without a theme mapping).
+- **[build_dashboard.py](build_dashboard.py)**: merges profiles and publications, runs the theme assignment, embeds everything in [dashboard_template.html](dashboard_template.html), writes `dashboard.html`, copies it to `index.html` (the GitHub Pages entry point) and, if the folder exists, to `cml-network-site/index.html`, and writes `tag_report.md` (tag quality checks, departments that were inferred, keywords without a theme mapping).
+- **cml-network-site/**: an optional local clone of a separate repository (CMLPlatform/senior_staff_dashboard). This repository does not track it (see `.gitignore`). `build_dashboard.py` updates its `index.html` only when the folder exists.
 - **[world_paths.json](world_paths.json)**: country outlines for the partner map, pre-projected (Natural Earth projection) from Natural Earth 1:110m data (public domain).
 
 - **[build_index.py](build_index.py)**: SQLite database with people, papers (title, abstract, keywords, topics), authorships and partners, plus full-text (BM25) indexes.
@@ -58,7 +61,7 @@ Settings go in `.env` (next to the scripts or one folder up).
 ### Rebuild
 
 ```bash
-pip install requests beautifulsoup4
+pip install -r requirements.txt   # anthropic is only needed with LLM_PROVIDER=anthropic
 python3 scrape_staff.py         # ~5 min; refresh profiles
 python3 harvest_openalex.py     # ~20-30 min first time; resumes if interrupted
 python3 build_network.py        # seconds
@@ -67,7 +70,7 @@ python3 build_index.py          # seconds; the assistant's database
 python3 serve.py                # dashboard + assistant at http://localhost:8765 (start LM Studio / Ollama first)
 ```
 
-Only the last two steps are needed after editing `harmonize.py` or the template. Without `data/network.json` the dashboard still builds, without publications.
+After you edit `harmonize.py` or the template, run `build_dashboard.py` again (and `build_index.py` and `serve.py` for the assistant). Commit and push `index.html` to update the online version. Without `data/network.json` the dashboard still builds, without publications.
 
 ## Adjusting the groupings
 
