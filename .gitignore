@@ -1,0 +1,12 @@
+# secrets
+.env
+# large or regenerable harvest files (rebuild with harvest_openalex.py / build_network.py)
+data/cache/
+data/works.jsonl
+data/collaborations.csv
+data/authorships.csv
+data/harvest.log
+data/pub_texts.json
+__pycache__/
+.DS_Store
+data/knowledge.db

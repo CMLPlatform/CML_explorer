@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<title>Institute of Environmental Sciences CML, Leiden University - Theme search dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --ie:#d9730d; --eb:#1f8a4c; --bg:#f5f6f8; --card:#fff; --line:#dde1e6; --ink:#1d2430; --mute:#6b7685; --accent:#2457c5; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); height:100vh; display:flex; flex-direction:column; }
+  header { padding:10px 16px; background:#fff; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; }
+  header .stats { color:var(--mute); }
+  .hbtns { margin-left:auto; display:flex; gap:6px; }
+  .btn { display:inline-flex; align-items:center; gap:6px; }
+  main { position:relative; flex:1; min-height:0; display:grid; grid-template-columns:290px minmax(0,1fr) 360px; }
+  aside, section { overflow:auto; padding:12px; min-height:0; }
+  body.hide-filters main { grid-template-columns:0 minmax(0,1fr) 360px; }
+  body.hide-people main { grid-template-columns:290px minmax(0,1fr) 0; }
+  body.hide-filters.hide-people main { grid-template-columns:0 minmax(0,1fr) 0; }
+  body.hide-filters aside.filters, body.hide-people aside.people { padding:0; border:0; overflow:hidden; visibility:hidden; }
+  .edgetab { position:absolute; top:50%; transform:translateY(-50%); z-index:6; width:16px; height:64px; padding:0; border:1px solid var(--line); background:#fff; color:var(--mute); font-size:16px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  .edgetab:hover { background:#eef3ff; color:var(--accent); }
+  .edgetab-l { left:290px; border-left:0; border-radius:0 8px 8px 0; }
+  .edgetab-r { right:360px; border-right:0; border-radius:8px 0 0 8px; }
+  body.hide-filters .edgetab-l { left:0; }
+  body.hide-people .edgetab-r { right:0; }
+  @media (max-width:1100px) { .edgetab-l { left:260px; } body.hide-filters .edgetab-l { left:0; } .edgetab-r { display:none; } }
+  @media (max-width:760px) { .edgetab { display:none; } }
+  aside.filters { background:#fff; border-right:1px solid var(--line); }
+  aside.people { background:#fff; border-left:1px solid var(--line); }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); margin:16px 0 6px; display:flex; align-items:center; gap:8px; }
+  h2:first-child { margin-top:0; }
+  h2 .spacer { flex:1; }
+  .row { display:flex; gap:6px; align-items:center; margin:3px 0; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .seg button { border:0; background:#fff; padding:3px 9px; cursor:pointer; font-size:12px; color:var(--mute); }
+  .seg button.on { background:var(--accent); color:#fff; }
+  button.link { border:0; background:none; color:var(--accent); cursor:pointer; padding:0; font-size:12px; }
+  button.btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  input[type=search] { width:100%; padding:5px 8px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; }
+  .list { max-height:230px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+  .list label { display:flex; gap:6px; align-items:center; padding:2px 0; cursor:pointer; }
+  .list label span.n { margin-left:auto; color:var(--mute); font-size:12px; }
+  .list label.zero { opacity:.45; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; flex:none; }
+  .toolbar { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .toolbar label { color:var(--mute); font-size:12px; display:flex; gap:6px; align-items:center; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; }
+  #graph-wrap { height:calc(100% - 210px); min-height:340px; position:relative; }
+  svg { width:100%; height:100%; display:block; }
+  .edge { stroke:#9aa5b4; stroke-opacity:.35; }
+  .node circle { stroke:#fff; stroke-width:1.5; cursor:pointer; }
+  .node text { font-size:calc(11px * var(--inv,1)); pointer-events:none; paint-order:stroke; stroke:#fff; stroke-width:calc(3px * var(--inv,1)); }
+  .node { cursor:pointer; }
+  .node circle, .edge { vector-effect:non-scaling-stroke; }
+  #svg { cursor:grab; touch-action:none; user-select:none; }
+  #svg.panning, #svg.panning .node { cursor:grabbing; }
+  .zoomctl { position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:4px; }
+  .zoomctl { z-index:3; }
+  .zoomctl button { width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center; text-align:center; font-size:18px; font-weight:500; line-height:1; color:var(--ink, #222); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .zoomctl button#zfit { font-size:12px; font-weight:600; }
+  .zoomctl button:hover { background:#eef3ff; }
+  #emptyMsg { position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--mute); pointer-events:none; }
+  mark { background:#fff3c4; padding:0 1px; border-radius:2px; }
+  .snippet { font-size:12px; color:var(--mute); margin-top:3px; }
+  .splitbar { display:flex; height:5px; border-radius:3px; overflow:hidden; margin-top:5px; background:#e8ebef; }
+  .splitbar i { display:block; height:100%; }
+  #clusterBox { margin-top:10px; padding:8px 10px; }
+  #clusterBox summary { cursor:pointer; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); }
+  #clusterBox[open] summary { margin-bottom:8px; }
+  .legendbar { margin-top:6px; font-size:12px; }
+  .legendbar:empty { display:none; }
+  .node.dim { opacity:.15; }
+  .node.sel circle { stroke:#111; stroke-width:3; }
+  .edge.dim { stroke-opacity:.05; }
+  #clusters { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px; max-height:190px; overflow:auto; }
+  .cluster { padding:8px; cursor:pointer; border-left-width:5px; border-left-style:solid; }
+  .cluster:hover, .cluster.sel { background:#eef3ff; }
+  .cluster b { display:block; margin-bottom:2px; }
+  .cluster small { color:var(--mute); }
+  .person { display:flex; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); }
+  .person img { width:48px; height:60px; object-fit:cover; border-radius:6px; background:#e8ebef; flex:none; }
+  .person .name { font-weight:600; }
+  .person .name a { color:inherit; text-decoration:none; }
+  .person .name a:hover { text-decoration:underline; }
+  .badge { font-size:11px; padding:1px 6px; border-radius:10px; color:#fff; margin-left:6px; vertical-align:1px; }
+  .chip { display:inline-block; font-size:11px; padding:1px 7px; margin:2px 3px 0 0; border-radius:10px; background:#eef1f5; cursor:pointer; border:1px solid transparent; }
+  .chip:hover { border-color:var(--accent); }
+  .chip.theme { background:#e7efff; }
+  .chip.hit { background:#fff3c4; }
+  .chip.active { background:var(--accent); color:#fff; }
+  .mute { color:var(--mute); }
+  .focus-bar { background:#fff8dc; border:1px solid #f0dc8a; border-radius:6px; padding:6px 8px; margin-bottom:8px; display:flex; gap:8px; align-items:center; }
+  .tip { position:fixed; pointer-events:none; background:#1d2430; color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; display:none; max-width:280px; z-index:5; }
+  #filterToggle { display:none; }
+  @media (max-width:1100px) { body.hide-filters main { grid-template-columns:0 1fr; } body.hide-people aside.people { display:none; } }
+  .sheet-head, #filterFab { display:none; }
+  .sheet-head { position:sticky; top:0; z-index:2; background:#fff; padding:12px 0; margin-bottom:4px; border-bottom:1px solid var(--line); align-items:center; gap:10px; }
+  .sheet-head b { font-size:16px; flex:1; }
+  .sheet-head .btn.primary, #filterFab { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #filterFab { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:20; padding:12px 22px; border-radius:24px; box-shadow:0 4px 14px rgba(0,0,0,.3); font-size:15px; font-weight:600; align-items:center; gap:8px; cursor:pointer; border:0; }
+  @media (max-width:1100px) { body { height:auto; min-height:100vh; } main { grid-template-columns:260px 1fr; } aside, section { overflow:visible; } aside.people { grid-column:1 / -1; border-left:0; } #graph-wrap { height:480px; } #clusters { max-height:none; } }
+    @media (max-width:760px) {
+    body { font-size:15px; }
+    header { padding:8px 12px; gap:6px 10px; position:sticky; top:0; z-index:10; }
+    header h1 { font-size:14px; flex:1 1 100%; }
+    header button { margin-left:0; }
+    main { display:flex; flex-direction:column; }
+    aside, section { padding:10px; }
+    aside.filters { position:fixed; inset:0; z-index:30; overflow:auto; border-right:0; display:none; padding:0 14px 90px; }
+    body.show-filters aside.filters { display:block; }
+    body.show-filters { overflow:hidden; }
+    .sheet-head { display:flex !important; }
+    #filterFab { display:flex; }
+    .list { max-height:240px; }
+    section { order:1; }
+    aside.people { order:3; border-left:0; border-top:1px solid var(--line); }
+    .list, .list.tall { max-height:200px; }
+    .list label { padding:6px 0; }
+    .list input[type=checkbox], #dept input { width:18px; height:18px; }
+    .seg button { padding:7px 12px; font-size:13px; }
+    .toolbar { gap:8px 12px; }
+    .toolbar input[type=range] { width:110px; }
+    #legend { display:none; }
+    #graph-wrap { height:auto; min-height:0; aspect-ratio:560 / 860; }
+    .node text { font-size:calc(15px * var(--inv,1)); }
+    #svg { touch-action:pan-y; }
+    #clusters { grid-template-columns:1fr; max-height:none; }
+    .cluster { padding:10px; }
+    .person img { width:56px; height:70px; }
+    .chip { font-size:12px; padding:3px 9px; }
+  }
+  .ico { flex:none; vertical-align:-3px; display:inline-block; }
+  .legendbar .lgrow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 16px; }
+  .legendbar .lg { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  header h1 { display:flex; align-items:center; gap:8px; }
+  header h1 .ico { color:var(--accent); }
+  #cmlPills { display:flex; flex-wrap:wrap; gap:6px; }
+  .pill { --c:#888; display:inline-flex; align-items:center; gap:4px; border:1px solid var(--line); background:#fff; border-radius:14px; padding:2px 8px 2px 6px; cursor:pointer; font-size:12px; color:var(--ink); }
+  .pill .ico { color:var(--c); }
+  .pill b { font-weight:600; font-size:10px; color:var(--mute); }
+  .pill:hover { border-color:var(--c); }
+  .pill.on { background:var(--c); border-color:var(--c); color:#fff; }
+  .pill.on .ico, .pill.on b { color:#fff; }
+  .pill.zero { opacity:.45; }
+  .cmlbadge { display:inline-flex; margin-left:5px; vertical-align:-3px; }
+  #activeFilters { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+  #activeFilters:empty { display:none; }
+  #activeFilters .chip { background:var(--accent); color:#fff; padding:2px 9px; }
+  #card { position:absolute; left:10px; top:10px; width:min(310px, calc(100% - 20px)); max-height:calc(100% - 20px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 6px 24px rgba(0,0,0,.18); padding:12px; z-index:5; font-size:12.5px; }
+  #card[hidden] { display:none; }
+  #card .chead { display:flex; gap:10px; align-items:flex-start; }
+  #card img { width:56px; height:70px; object-fit:cover; border-radius:6px; background:#eee; flex:none; }
+  #card svg.ico { position:static; inset:auto; width:12px; height:12px; }
+  #card h3 { margin:0 0 2px; font-size:15px; }
+  #card .sub { color:var(--mute); }
+  #card .cx { margin-left:auto; border:0; background:none; cursor:pointer; font-size:18px; line-height:1; color:var(--mute); }
+  #card h4 { margin:10px 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); }
+  #card .row { display:flex; flex-wrap:wrap; gap:4px; }
+  #card .bio { margin:8px 0 0; line-height:1.4; }
+  .halo { pointer-events:none; }
+  .halo-label { pointer-events:all; cursor:pointer; }
+  .halo-label:hover text, .halo-label.hot text { text-decoration:underline; }
+  .halo-label text { font-size:13px; font-weight:600; paint-order:stroke; stroke:#fff; stroke-width:3px; }
+  details.bio { margin-top:4px; font-size:12px; }
+  details.bio summary { cursor:pointer; color:var(--accent); }
+  details.bio p { margin:4px 0 0; color:var(--mute); max-height:200px; overflow:auto; }
+  details.facet { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+  details.facet summary { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); cursor:pointer; }
+  details.facet summary .sel { color:var(--accent); text-transform:none; letter-spacing:0; }
+  details.facet[open] summary { margin-bottom:8px; }
+  .opts { position:relative; margin-left:auto; }
+  .opts summary { cursor:pointer; font-size:12px; color:var(--mute); padding:3px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; list-style:none; }
+  .opts summary::-webkit-details-marker { display:none; }
+  .opts[open] summary { color:var(--ink); border-color:var(--accent); }
+  .optsbody { position:absolute; right:0; top:calc(100% + 4px); z-index:6; min-width:230px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px; box-shadow:0 6px 18px rgba(0,0,0,.14); display:flex; flex-direction:column; gap:8px; }
+  .optsbody label { justify-content:space-between; }
+  @media (min-width:1101px) {
+    section { display:flex; flex-direction:column; }
+    section > * { flex:none; }
+    section > #graph-wrap { flex:1; height:auto; min-height:340px; }
+    #graph-wrap svg { position:absolute; inset:0; }
+  }
+  body[data-view=people] .needs-items, body[data-group=cml] .needs-clusters { display:none; }
+  .person.hl { background:#fffbe6; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .node:focus-visible { outline:none; }
+  .node:focus-visible circle { stroke:#111; stroke-width:3; }
+  /* views: map / partners / expertise (added with the publication data) */
+  .tabs { display:inline-flex; gap:2px; }
+  .tabs button { border:0; background:none; padding:4px 10px; border-radius:6px; cursor:pointer; color:var(--mute); font-size:13px; font-weight:500; }
+  .tabs button.on { background:#e7efff; color:var(--accent); }
+  .tabs button:hover { color:var(--ink); }
+  body:not([data-tab=map]) section > .map-part { display:none !important; }
+  .pane { display:flex; flex-direction:column; gap:10px; min-height:0; }
+  .pane[hidden] { display:none; }
+  .pane .panel { padding:10px 12px; }
+  .pane h3 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); margin:0 0 8px; font-weight:600; }
+  .pane-intro { color:var(--mute); font-size:12.5px; margin:0; }
+  #worldMap { width:100%; height:auto; aspect-ratio:960 / 470; display:block; }
+  #worldMap path { stroke:#fff; stroke-width:.5; cursor:default; vector-effect:non-scaling-stroke; }
+  #worldMap path.has { cursor:pointer; }
+  #worldMap path.has:hover { stroke:var(--ink); stroke-width:1; }
+  #worldMap path.sel { stroke:#111; stroke-width:1.6; }
+  .scale { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--mute); }
+  .scale i { width:110px; height:8px; border-radius:4px; background:linear-gradient(90deg,#e3ecfb,#2457c5); }
+  .split2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  @media (max-width:1300px) { .split2 { grid-template-columns:minmax(0,1fr); } }
+  .tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .tbl th { text-align:left; color:var(--mute); font-weight:500; font-size:11.5px; padding:4px 6px; position:sticky; top:0; background:#fff; }
+  .tbl td { padding:5px 6px; border-top:1px solid var(--line); vertical-align:top; }
+  .tbl td.num, .tbl th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .tbl tr.click { cursor:pointer; }
+  .tbl tr.click:hover td, .tbl tr.sel td { background:#eef3ff; }
+  .scrollbox { max-height:420px; overflow:auto; }
+  .plist { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; font-size:12.5px; }
+  .plist li { display:flex; justify-content:space-between; gap:10px; }
+  .plist .n { color:var(--mute); font-variant-numeric:tabular-nums; flex:none; }
+  .who { border:0; background:none; padding:0; color:var(--accent); cursor:pointer; font:inherit; text-align:left; }
+  .who:hover { text-decoration:underline; }
+  .xres { display:flex; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); }
+  .xres img { width:42px; height:52px; object-fit:cover; border-radius:6px; background:#e8ebef; flex:none; }
+  .xres .why { font-size:12px; color:var(--mute); margin-top:2px; }
+  .examples { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:12px; color:var(--mute); }
+  #card .paper { display:block; padding:4px 0; border-top:1px solid var(--line); color:var(--ink); text-decoration:none; }
+  #card .paper:first-child { border-top:0; }
+  #card a.paper:hover { color:var(--accent); }
+  #card .paper small { display:block; color:var(--mute); }
+  #card .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:6px; }
+  #card .kpis div { border:1px solid var(--line); border-radius:6px; padding:4px 6px; }
+  #card .kpis b { display:block; font-size:15px; font-variant-numeric:tabular-nums; }
+  #card .kpis span { color:var(--mute); font-size:11px; }
+  #card .note { margin-top:6px; font-size:11.5px; color:var(--mute); background:#f7f8fa; border:1px dashed var(--line); border-radius:6px; padding:4px 6px; }
+  .edge.coauthor { stroke:#2457c5; stroke-opacity:.45; }
+  /* Ask view (needs serve.py) */
+  #askPane { min-height:0; }
+  #askLog { display:flex; flex-direction:column; gap:12px; }
+  .msg { max-width:760px; line-height:1.5; }
+  .msg.user { align-self:flex-end; background:#e7efff; border-radius:10px 10px 2px 10px; padding:8px 12px; }
+  .msg.bot { background:#fff; border:1px solid var(--line); border-radius:10px 10px 10px 2px; padding:10px 14px; }
+  .msg.bot p { margin:0 0 8px; } .msg.bot p:last-child { margin-bottom:0; }
+  .msg.bot ul, .msg.bot ol { margin:4px 0 8px; padding-left:20px; }
+  .msg.bot h4 { margin:10px 0 4px; font-size:13px; }
+  .msg sup a { color:var(--accent); text-decoration:none; font-weight:600; padding:0 1px; }
+  .msg .refs { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); font-size:12px; color:var(--mute); }
+  .msg .refs ol { margin:0; padding-left:18px; } .msg .refs a { color:inherit; }
+  .msg .steps { font-size:11.5px; color:var(--mute); margin-bottom:6px; }
+  .msg.err { border-color:#e8b4b4; background:#fff6f6; }
+  .askbar { display:flex; gap:8px; align-items:flex-end; }
+  .askbar textarea { flex:1; min-height:44px; max-height:160px; resize:vertical; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  .askbar .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); padding:8px 16px; }
+  .scope { display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--mute); flex-wrap:wrap; }
+  .scope .chip { cursor:default; }
+  .thinking { color:var(--mute); font-style:italic; }
+  .edge.coauthor.dim { stroke-opacity:.06; }
+  .kbd { font-size:11px; border:1px solid var(--line); border-radius:4px; padding:0 4px; color:var(--mute); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span data-ico="network" data-size="20"></span>Institute of Environmental Sciences CML, Leiden University - Theme search dashboard</h1>
+  <span class="stats" id="stats"></span>
+  <nav class="tabs" id="tabs" aria-label="Views"><button data-tab="map" class="on">Themes map</button><button data-tab="partners">External partners</button><button data-tab="expertise">Find expertise</button><button data-tab="ask">Ask</button></nav>
+  <div class="hbtns"><button class="btn" id="share" title="Copy a link to this exact view"><span data-ico="link"></span><span id="shareTxt">Copy link</span></button></div>
+</header>
+<main>
+  <button class="edgetab edgetab-l" id="edgeFilters" aria-pressed="true" aria-label="Hide filter panel" title="Hide / show the filter panel">‹</button>
+  <button class="edgetab edgetab-r" id="edgePeople" aria-pressed="true" aria-label="Hide people list" title="Hide / show the people list">›</button>
+  <aside class="filters" id="filters">
+    <div class="sheet-head"><b>Filters</b><button class="btn" id="sheetReset">Reset</button><button class="btn primary" id="sheetDone">Show results</button></div>
+    <h2>Search people</h2>
+    <input type="search" id="q" placeholder="Name, topic, anything in the bio…  ( / )" autocomplete="off">
+    <h2>CML research theme</h2>
+    <div id="cmlPills"></div>
+    <h2>Department</h2>
+    <div id="dept"></div>
+    <h2>Position</h2>
+    <div id="pos"></div>
+
+    <details class="facet" id="tagBox">
+      <summary>Harmonized tags <span class="sel" id="tagSel"></span></summary>
+      <div class="row"><span class="mute">Match</span>
+        <span class="seg" id="tagMode"><button data-m="any" class="on" title="Person has at least one selected tag">any</button><button data-m="all" title="Person has all selected tags">all</button></span>
+        <span class="spacer" style="flex:1"></span><button class="link" data-clear="tag">clear</button></div>
+      <input type="search" id="tagSearch" placeholder="Search tags…">
+      <div class="list" id="tagList"></div>
+    </details>
+
+    <details class="facet" id="kwBox">
+      <summary>Original keywords <span class="sel" id="kwSel"></span></summary>
+      <div class="row"><span class="mute">Match</span>
+        <span class="seg" id="kwMode"><button data-m="any" class="on" title="Person has at least one selected keyword">any</button><button data-m="all" title="Person has all selected keywords">all</button></span>
+        <span class="spacer" style="flex:1"></span><button class="link" data-clear="kw">clear</button></div>
+      <input type="search" id="kwSearch" placeholder="Search keywords…">
+      <div class="list" id="kwList"></div>
+    </details>
+  </aside>
+
+  <section>
+    <div class="toolbar map-part">
+      <label>Group by
+      <span class="seg" id="colorBy" title="How people are grouped on the map">
+        <button data-c="cml" class="on" title="The institute's five research themes">CML themes</button>
+        <button data-c="field" title="Clusters of people who study similar topics (harmonized tags + keywords)">Field cluster</button>
+        <button data-c="method" title="Clusters of people who use similar methods">Method cluster</button>
+      </span></label>
+      <label>Lines
+      <span class="seg" id="lines" title="What the lines between people show">
+        <button data-l="topics" class="on" title="People who share tags and keywords">Shared topics</button>
+        <button data-l="coauthor" title="People who wrote papers together at Leiden (OpenAlex)">Co-authorship</button>
+      </span></label>
+      <details class="opts"><summary>Display options</summary>
+        <div class="optsbody">
+          <label class="needs-items">Min. people per node
+            <span><input type="range" id="minCount" min="1" max="6" value="1"> <b id="minCountVal">1</b></span>
+          </label>
+          <label class="needs-clusters">Cluster detail
+            <span><input type="range" id="resolution" min="0.5" max="4" step="0.25" value="2"> <b id="resolutionVal">2</b></span>
+          </label>
+          <label><span>Show all labels</span> <input type="checkbox" id="allLabels"></label>
+        </div>
+      </details>
+      <button class="btn" id="reset" title="Clear all filters and selections"><span data-ico="reset"></span>Reset all</button>
+    </div>
+    <div id="activeFilters"></div>
+    <div id="graph-wrap" class="panel map-part">
+      <svg id="svg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"><g id="vp"><g id="halos"></g><g id="edges"></g><g id="nodes"></g></g></svg>
+      <aside id="card" hidden aria-live="polite"></aside>
+      <div id="emptyMsg">No items for the current filters</div>
+      <div class="zoomctl"><button class="btn" id="zin" title="Zoom in" aria-label="Zoom in">+</button><button class="btn" id="zout" title="Zoom out" aria-label="Zoom out">−</button><button class="btn" id="zfit" title="Fit to view">Fit</button></div>
+    </div>
+    <div class="legendbar mute map-part" id="legend"></div>
+    <details id="clusterBox" class="panel map-part"><summary id="clusterSum">Clusters</summary><div id="clusters"></div></details>
+
+    <div class="pane" id="partnersPane" hidden>
+      <p class="pane-intro">Institutions and countries CML researchers publish with, counted over joint papers written at Leiden since 2010 (OpenAlex). The filters on the left choose whose papers count.</p>
+      <div class="panel">
+        <div class="toolbar" style="margin-bottom:4px"><span class="seg" id="mapView"><button data-mv="world" class="on">World</button><button data-mv="europe">Europe</button></span><div class="scale"><span>fewer joint papers</span><i></i><span>more</span></div><span class="mute" id="partnersSum" style="font-size:12px"></span></div>
+        <svg id="worldMap" viewBox="0 0 960 470" role="img" aria-label="Map of partner countries"></svg>
+      </div>
+      <div class="split2">
+        <div class="panel">
+          <h3 id="instTitle">Partner institutions</h3>
+          <div class="row"><input type="search" id="instQ" placeholder="Filter institutions…" style="margin:0"><button class="link" id="clearCountry" hidden style="flex:none">all countries</button></div>
+          <div class="scrollbox"><table class="tbl" id="instTable"><thead><tr><th>Institution</th><th>Country</th><th class="num">Papers</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="panel">
+          <h3 id="sideTitle">Countries</h3>
+          <div class="scrollbox" id="sideBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="askPane" hidden>
+      <div class="panel" id="askIntro"></div>
+      <div id="askLog"></div>
+      <div class="panel">
+        <div class="scope" id="askScope"></div>
+        <div class="askbar"><textarea id="askQ" placeholder="Ask about CML research, e.g. Who works on critical raw materials, and with which partners?" rows="2"></textarea>
+          <button class="btn primary" id="askGo">Ask</button></div>
+      </div>
+    </div>
+
+    <div class="pane" id="expertisePane" hidden>
+      <div class="panel">
+        <h3>Who works on…</h3>
+        <input type="search" id="xq" placeholder="A topic, e.g. critical raw materials" autocomplete="off">
+        <div class="examples" id="xExamples"></div>
+      </div>
+      <div class="panel"><div id="xResults"></div></div>
+    </div>
+  </section>
+
+  <aside class="people">
+    <h2>People <span class="mute" id="peopleCount"></span></h2>
+    <div id="focusBar"></div>
+    <div id="people"></div>
+  </aside>
+</main>
+<button id="filterFab" type="button">Filters</button>
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = __DATA__;
+const TAX = __TAXONOMY__;
+const NET = __NETWORK__;     // co-authorship and partners (null when no OpenAlex harvest is available)
+const WORLD = __WORLD__;     // pre-projected country shapes for the partner map
+const COLORS = { industrial_ecology: "#d9730d", environmental_biology: "#1f8a4c" };
+const LABELS = { industrial_ecology: "Industrial ecology", environmental_biology: "Environmental biology" };
+const THEME_LINK = 2;   // weight of the implicit link between keywords of the same theme
+const PALETTE = ["#2457c5","#c0392b","#8e44ad","#16a085","#d68910","#2c3e50","#e84393","#6c8f1a","#0984e3","#b8860b","#7f8c8d","#a0522d"];
+const NS = "http://www.w3.org/2000/svg";
+const ICONS = {
+  "Biodiversity": '<path d="M5 19c0-9 5-14 15-14 0 10-5 15-13 15"/><path d="M5 19c2-5 5-8 9-10"/>',
+  "Future food": '<path d="M12 21v-9"/><path d="M12 13c0-4-3-6-7-6 0 4 3 6 7 6z"/><path d="M12 15c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+  "Resources": '<path d="M12 2.5l8.5 4.8v9.4L12 21.5l-8.5-4.8V7.3z"/><path d="M12 12l8.5-4.7M12 12L3.5 7.3M12 12v9.5"/>',
+  "Urban": '<path d="M4 21V6l7-3v18"/><path d="M11 9h9v12"/><path d="M3 21h18"/><path d="M7 9h1M7 13h1M7 17h1M15 13h1M15 17h1"/>',
+  "Water": '<path d="M12 2.8s6.5 6.4 6.5 11a6.5 6.5 0 0 1-13 0c0-4.6 6.5-11 6.5-11z"/><path d="M9 15a3 3 0 0 0 3 3"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  network: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l3.5 8M16.5 10.5L13 16"/>',
+};
+const icon = (name, size = 16, color) => `<svg class="ico" width="${size}" height="${size}" style="width:${size}px;height:${size}px" viewBox="0 0 24 24" fill="none" stroke="${color || "currentColor"}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+document.querySelectorAll("[data-ico]").forEach(e => { e.innerHTML = icon(e.dataset.ico, +(e.dataset.size || 16)); });
+const CML_ORDER = ["Biodiversity", "Water", "Future food", "Resources", "Urban"];
+const RING = CML_ORDER;   // theme anchors on the people map
+const cmlColor = c => TAX.cml[c] || "#bbb";
+
+const people = Object.values(DATA).flat().map(p => ({
+  ...p,
+  themes: p.harmonized_tags,
+  kws: p.original_keywords || [],
+  tagSet: new Set(p.harmonized_tags),
+  kwSet: new Set(p.original_keywords || []),
+  cmlSet: new Set(p.cml_themes),
+  pub: p.pub || { n: 0, n_cml: 0, cites: 0, pkw: [], topics: [], sub: [], partners: [], countries: [], ext_coauthors: [], papers: [] },
+  hay: [p.name, p.title, p.rank, p.summary, ...p.harmonized_tags, ...(p.original_keywords || []),
+        ...((p.pub || {}).pkw || []), ...((p.pub || {}).topics || [])].join(" \n ").toLowerCase(),
+}));
+const byPid = new Map(people.map(p => [p.id, p]));
+const POSITIONS = ["Professors", "Associate & assistant professors", "Postdocs & researchers", "PhD candidates"];
+// CML co-author links (papers written together at Leiden), by profile id
+const COAUTH = new Map();
+(NET ? NET.edges : []).forEach(([a, b, n]) => {
+  (COAUTH.get(a) || COAUTH.set(a, []).get(a)).push([b, n]);
+  (COAUTH.get(b) || COAUTH.set(b, []).get(b)).push([a, n]);
+});
+COAUTH.forEach(l => l.sort((x, y) => y[1] - x[1]));
+
+const state = { card: null, depts: new Set(Object.keys(LABELS)), tags: new Set(), kws: new Set(), tagMode: "any", kwMode: "any",
+                view: "people", cml: new Set(), minCount: 1, resolution: 2, focus: null, allLabels: false, tagQ: "", kwQ: "",
+                q: "", terms: [], colorBy: "cml",
+                pos: new Set(POSITIONS), lines: "topics", tab: "map", xq: "", country: null, inst: null, instQ: "", mapView: "world" };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const svgEl = t => document.createElementNS(NS, t);
+
+function matches(sel, set, mode) {
+  if (!sel.size) return true;
+  const arr = [...sel];
+  return mode === "all" ? arr.every(x => set.has(x)) : arr.some(x => set.has(x));
+}
+function passes(p, skip) {
+  if (!state.depts.has(p.field)) return false;
+  if (!state.pos.has(p.position)) return false;
+  if (skip !== "tag" && !matches(state.tags, p.tagSet, state.tagMode)) return false;
+  if (skip !== "kw" && !matches(state.kws, p.kwSet, state.kwMode)) return false;
+  if (skip !== "cml" && state.cml.size && !p.cml_themes.some(c => state.cml.has(c))) return false;
+  if (state.terms.length && !state.terms.every(t => p.hay.includes(t))) return false;
+  return true;
+}
+const filtered = () => people.filter(p => passes(p));
+
+const GENERIC = new Set(["sustainability", "environment", "industrial ecology", "environmental sciences", "sustainable development", "environmental science"]);
+function itemsOf(p) { return state.view === "people" ? [p.name] : state.view === "tags" ? p.themes : p.kws.filter(k => !GENERIC.has(k.toLowerCase())); }
+
+/* ---------- filters ---------- */
+function renderDept() {
+  $("dept").innerHTML = Object.keys(LABELS).map(k => {
+    const n = people.filter(p => p.field === k).length;
+    return `<label class="row" style="cursor:pointer"><input type="checkbox" data-dept="${k}" ${state.depts.has(k) ? "checked" : ""}>
+      <span class="dot" style="background:${COLORS[k]}"></span>${LABELS[k]} <span class="mute" style="margin-left:auto">${n}</span></label>`;
+  }).join("");
+}
+
+function renderPos() {
+  $("pos").innerHTML = POSITIONS.map(k => {
+    const n = people.filter(p => p.position === k && state.depts.has(p.field)).length;
+    return `<label class="row" style="cursor:pointer"><input type="checkbox" data-pos="${esc(k)}" ${state.pos.has(k) ? "checked" : ""}>
+      ${esc(k)} <span class="mute" style="margin-left:auto">${n}</span></label>`;
+  }).join("");
+}
+
+function renderFacet(listId, key, getItems, selSet, query) {
+  const counts = new Map();
+  people.filter(p => passes(p, key)).forEach(p => getItems(p).forEach(i => counts.set(i, (counts.get(i) || 0) + 1)));
+  selSet.forEach(i => { if (!counts.has(i)) counts.set(i, 0); });
+  const q = query.trim().toLowerCase();
+  const rows = [...counts.entries()].filter(([i]) => !q || i.toLowerCase().includes(q) || selSet.has(i))
+    .sort((a, b) => (selSet.has(b[0]) - selSet.has(a[0])) || b[1] - a[1] || a[0].localeCompare(b[0]));
+  $(listId).innerHTML = rows.map(([i, n]) =>
+    `<label class="${n === 0 ? "zero" : ""}"><input type="checkbox" data-${key}="${esc(i)}" ${selSet.has(i) ? "checked" : ""}> ${esc(i)}<span class="n">${n}</span></label>`
+  ).join("") || '<span class="mute">No matches</span>';
+}
+
+function renderPills() {
+  const counts = new Map();
+  people.filter(p => passes(p, "cml")).forEach(p => p.cml_themes.forEach(c => counts.set(c, (counts.get(c) || 0) + 1)));
+  $("cmlPills").innerHTML = CML_ORDER.map(c => {
+    const n = counts.get(c) || 0, on = state.cml.has(c);
+    return `<button type="button" class="pill ${on ? "on" : ""} ${n === 0 && !on ? "zero" : ""}" data-cml="${esc(c)}" style="--c:${cmlColor(c)}" aria-pressed="${on}">${icon(c, 12)}<span>${esc(c)}</span><b>${n}</b></button>`;
+  }).join("");
+}
+const shortName = full => {
+  const tk = full.split(" "); let i = tk.length - 1;
+  while (i > 1 && /^[a-z]/.test(tk[i - 1])) i--;
+  return tk[0][0] + ". " + tk.slice(i).join(" ");
+};
+const labelOf = n => n.person ? shortName(n.person.name) : n.id;
+// Tag nodes take the primary CML theme most of the people holding them have (ties: CML_ORDER).
+const cmlOfNode = n => {
+  const c = {}; n.people.forEach(p => { c[p.cml_themes[0]] = (c[p.cml_themes[0]] || 0) + 1; });
+  return CML_ORDER.slice().sort((a, b) => (c[b] || 0) - (c[a] || 0))[0];
+};
+const cmlGrouped = () => state.view === "people" && state.colorBy === "cml";   // people placed by CML theme; otherwise by shared tags
+const groupTheme = p => (state.cml.size && p.cml_themes.find(c => state.cml.has(c))) || p.cml_themes[0];
+function ringOrder(clusters) {   // neighbours on the ring = clusters that share the most people
+  if (!clusters.length) return;
+  const shared = (a, b) => a.members.filter(n => b.members.includes(n)).length;
+  const left = clusters.slice(), seq = [left.shift()];
+  while (left.length) {
+    const cur = seq[seq.length - 1];
+    left.sort((a, b) => shared(b, cur) - shared(a, cur) || b.members.length - a.members.length);
+    seq.push(left.shift());
+  }
+  seq.forEach((c, i) => { c.ring = i; c.ringN = seq.length; });
+}
+function clusterAnchor(n, all, W, H) {   // each cluster gets its own spot on an ellipse; multi-cluster people sit between theirs
+  let x = 0, y = 0, tw = 0;
+  (n.memberships || [n.cluster]).forEach((c, k) => {
+    const i = c.ring !== undefined ? c.ring : Math.max(0, all.indexOf(c)), a = -Math.PI / 2 + i * 2 * Math.PI / Math.max(c.ringN || all.length, 1), w = k ? 1 : 2;
+    x += Math.cos(a) * w; y += Math.sin(a) * w; tw += w;
+  });
+  return { x: W / 2 + x / tw * W * 0.44, y: H / 2 + y / tw * H * 0.42 };
+}
+function personAnchor(p, W, H) {   // primary theme counts double; secondary themes pull the person towards the overlap
+  const prim = groupTheme(p);
+  let x = 0, y = 0, tw = 0;
+  p.cml_themes.forEach(t => {
+    const i = Math.max(0, RING.indexOf(t)), a = -Math.PI / 2 + i * 2 * Math.PI / RING.length, w = t === prim ? 2 : 1;
+    x += Math.cos(a) * w; y += Math.sin(a) * w; tw += w;
+  });
+  return { x: W / 2 + x / tw * W * 0.44, y: H / 2 + y / tw * H * 0.42 };
+}
+
+/* ---------- graph model ---------- */
+const positions = new Map();   // id -> {x,y}, kept between renders so the layout stays stable
+let graph = { nodes: [], links: [], clusters: [] };
+
+function docFreq() {
+  const df = new Map();
+  people.forEach(p => new Set(itemsOf(p)).forEach(i => df.set(i, (df.get(i) || 0) + 1)));
+  return df;
+}
+
+// Cluster mode: people are compared on harmonized tags AND original keywords (plus a faint CML-theme signal for people with
+// little scraped evidence). Features are weighted by rarity (idf) so generic tags such as "Life cycle assessment" don't
+// glue everyone together; similarity is cosine; each person links to their nearest neighbours; everyone ends up in a cluster.
+// ---------- people clusters: "field" (what they study) and "method" (how they study it) ----------
+// Names: each label lists the evidence for it; every cluster takes the best-matching label not already taken, and a cluster
+// no label fits keeps an auto-generated name from its most shared features.
+const FIELD_NAMES = [
+  { name: "Products & technology", tags: ["Life cycle assessment", "Decision support & uncertainty", "Sustainability assessment & indicators"], kws: ["life cycle assessment", "emerging technologies", "safe and sustainable by design", "textiles", "consumer goods", "decision support"] },
+  { name: "Materials & built environment", tags: ["Material & substance flow analysis", "Built environment & mobility", "Circular economy & critical materials"], kws: ["material flow analysis", "substance flow analysis", "built environment", "buildings", "construction materials", "circular economy", "critical raw materials"] },
+  { name: "Economy & consumption", tags: ["Input-output analysis & footprints", "Policy, economics & governance", "Wellbeing, sufficiency & post-growth"], kws: ["input-output analysis", "environmental footprints", "consumption-based emissions", "beyond-gdp", "trade", "econometrics"] },
+  { name: "Food & land", tags: ["Food systems", "Land use & landscapes", "Nutrients & biogeochemical cycles"], kws: ["sustainable food systems", "global food trade", "food", "land use change", "animal welfare", "nitrogen"] },
+  { name: "Energy & earth systems", tags: ["Climate, energy & decarbonisation", "Earth system & global change", "Modelling, scenarios & integrated assessment", "Data science, computing & AI"], kws: ["energy modeling", "integrated assessment models", "earth system", "biogeochemical modelling", "high performance computing"] },
+  { name: "Pollution & ecotoxicology", tags: ["Ecotoxicology & chemical pollution"], kws: ["ecotoxicology", "pesticides", "plastic pollution", "emerging contaminants", "metals"] },
+  { name: "Nature & society", tags: ["Ecosystem services & nature-based solutions", "Urban nature & green infrastructure"], kws: ["ecosystem services", "nature-based solutions", "urban ecology", "human-nature interactions", "environmental philosophy"] },
+  { name: "Wildlife & conservation", tags: ["Animal & movement ecology", "Conservation, invasion & resilience", "Biodiversity & community ecology", "Genetics & eDNA"], kws: ["conservation biology", "bird ecology", "movement ecology", "biodiversity", "edna", "large herbivore ecology"] },
+  { name: "Soil, plants & microbes", tags: ["Soil, fungi & microbes", "Plant & vegetation ecology"], kws: ["soil ecology", "fungi", "microbiomes", "plant soil interactions", "aquatic ecology", "plankton"] },
+  { name: "Water & aquatic systems", tags: ["Water & aquatic systems"], kws: ["water", "water quality", "global hydrology", "freshwater biodiversity"] },
+];
+// Methods: evidence in the person's original keywords (kw), in the start of the bio (text), or in a harmonized tag.
+const METHODS = [
+  { name: "Life cycle assessment", kw: /life cycle|\blca\b|lcia|\bplca\b/, text: /life[- ]cycle|\blca\b|\blcia\b/, tags: ["Life cycle assessment"] },
+  { name: "Safe & sustainable by design", kw: /safe and sustainable|ssbd|emerging technolog/, text: /safe and sustainable|ssbd|safe-and-sustainable|safe-by-design|prospective|emerging technolog/, tags: [] },
+  { name: "Input-output analysis", kw: /input-output|supply-use|footprint|consumption-based/, text: /input[- ]output|supply[- ]use|footprint|\bmrio\b|exiobase|consumption-based/, tags: ["Input-output analysis & footprints"] },
+  { name: "Material flow analysis", kw: /material flow|substance flow|material stock|metabolism|\bmfa\b|stocks and flows/, text: /material flow|substance flow|material stock|metabolism|stocks and flows/, tags: ["Material & substance flow analysis"] },
+  { name: "Modelling & scenarios", kw: /model+ing|scenario|integrated assessment|simulation|dynamic|optimi[sz]ation|system dynamics/, text: /modell?ing|scenario|simulation|system dynamics|integrated assessment/, tags: ["Modelling, scenarios & integrated assessment"] },
+  { name: "Decision support & uncertainty", kw: /decision|uncertainty|sensitivity|multi-criteria|indicator/, text: /decision|uncertaint|multi-criteria|\bmcda\b|sensitivity analysis/, tags: ["Decision support & uncertainty", "Sustainability assessment & indicators"] },
+  { name: "Data science & AI", kw: /\bdata\b|python|artificial intelligence|computing|machine learning|software|reverse engineering|computational/, text: /machine learning|artificial intelligence|\bai\b|data science|software|big data|high performance|database|data collection|data analytics/, tags: ["Data science, computing & AI"] },
+  { name: "Spatial analysis & GIS", kw: /\bgis\b|spatial|geospatial|remote sensing|biologging|tracking/, text: /\bgis\b|remote sensing|geospatial|spatial analysis|biologging/, tags: ["Spatial analysis & GIS"] },
+  { name: "Statistics & theory", kw: /econometric|statistic|mathematical|theor/, text: /statistic|mathematical|theoretical|econometr|bayesian/, tags: [] },
+  { name: "Field & experimental work", kw: /mesocosm|monitoring|wildlife tracking|field|experiment/, text: /fieldwork|field experiment|experiment|monitoring|mesocosm|field study|long-term/, tags: [] },
+  { name: "Molecular & eDNA", kw: /edna|\bdna\b|genetic|hybridi|microbiom/, text: /\bdna\b|genetic|genom|molecular|sequenc|metabarcod/, tags: ["Genetics & eDNA"] },
+  { name: "Toxicity & risk assessment", kw: /ecotoxic|risk assessment|nanoecotox|toxic/, text: /ecotoxic|toxicity|risk assessment|exposure|bioassay/, tags: ["Ecotoxicology & chemical pollution"] },
+  { name: "Social science & policy", kw: /policy|philosoph|religion|governance|interview|participat|human-nature|wellbeing/, text: /interview|survey|participatory|stakeholder|qualitative|policy analysis|governance|philosoph|co-creation/, tags: ["Policy, economics & governance", "Wellbeing, sufficiency & post-growth"] },
+  { name: "Ecosystem service assessment", kw: /ecosystem services|nature-based|natural capital|indicators|mapping/, text: /ecosystem services?|valuation|natural capital|mapping|nature[- ]based/, tags: ["Ecosystem services & nature-based solutions"] },
+];
+// People whose profile gives no method evidence get a method inferred from their field tags, then from their CML theme.
+const METHOD_FROM_TAG = [
+  ["Ecotoxicology & chemical pollution", "Toxicity & risk assessment"], ["Genetics & eDNA", "Molecular & eDNA"],
+  ["Animal & movement ecology", "Field & experimental work"], ["Plant & vegetation ecology", "Field & experimental work"],
+  ["Soil, fungi & microbes", "Field & experimental work"], ["Conservation, invasion & resilience", "Field & experimental work"],
+  ["Biodiversity & community ecology", "Field & experimental work"], ["Water & aquatic systems", "Field & experimental work"],
+  ["Ecosystem services & nature-based solutions", "Ecosystem service assessment"],
+];
+const METHOD_FROM_CML = { "Biodiversity": "Field & experimental work", "Resources": "Life cycle assessment", "Future food": "Input-output analysis", "Urban": "Material flow analysis", "Water": "Modelling & scenarios" };
+// Manual corrections where keywords/bio give a wrong or missing signal: ordered methods, first = primary.
+const METHOD_OVERRIDES = {
+  "Marco Cinelli": ["Decision support & uncertainty", "Safe & sustainable by design"],   // MCDA; chemical safety / SSbD applications
+  "Stefano Cucurachi": ["Safe & sustainable by design", "Life cycle assessment", "Decision support & uncertainty"],   // research focus is SSbD
+  "Carlos Felipe Blanco Rocha": ["Safe & sustainable by design", "Life cycle assessment", "Toxicity & risk assessment"],
+  "Nils Thonemann": ["Life cycle assessment", "Safe & sustainable by design", "Data science & AI"],
+  "Franco Donati": ["Data science & AI", "Modelling & scenarios", "Life cycle assessment", "Input-output analysis", "Field & experimental work"],
+  "Robert Istrate": ["Data science & AI", "Life cycle assessment", "Modelling & scenarios"],   // python, mathematical programming, scenario analysis
+  "Marco Visser": ["Toxicity & risk assessment", "Data science & AI"],   // statistical / computational ecology
+  "Jeroen Guinee": ["Life cycle assessment", "Safe & sustainable by design", "Material flow analysis"],
+  "Thijs Bosker": ["Toxicity & risk assessment", "Field & experimental work"],
+  "Martina Vijver": ["Toxicity & risk assessment", "Field & experimental work", "Modelling & scenarios"],   // lab/mesocosm/field experiments, monitoring, process-based models
+  "Peter van Bodegom": ["Modelling & scenarios", "Ecosystem service assessment", "Data science & AI"],   // global vegetation modelling, trait databases
+  "Arjan de Koning": ["Life cycle assessment", "Input-output analysis", "Modelling & scenarios"],
+  "Hai Lin": ["Data science & AI", "Modelling & scenarios"],   // HPC, data assimilation, numerical modelling
+  "Valerio Barbarossa": ["Modelling & scenarios", "Spatial analysis & GIS", "Life cycle assessment"],   // global hydrological / biodiversity models
+  "Laura Scherer": ["Life cycle assessment", "Input-output analysis"],   // bio gives no method
+  "Maarten Schrama": ["Field & experimental work"],   // herbivore field experiments
+};
+function methodFeatures(p) {   // method name -> strength
+  if (p._mf) return p._mf;
+  if (METHOD_OVERRIDES[p.name]) return p._mf = new Map(METHOD_OVERRIDES[p.name].map((m, i) => [m, 2.4 - 0.35 * i]));
+  const kws = p.kws.join(" | ").toLowerCase(), bio = `${p.title || ""} ${(p.summary || "").slice(0, 2500)}`.toLowerCase(), f = new Map();
+  METHODS.forEach(m => {
+    let w = 0;
+    if (m.kw.test(kws)) w += 1;
+    if (m.tags.some(t => p.tagSet.has(t))) w += 0.8;
+    const hits = (bio.match(new RegExp(m.text.source, "g")) || []).length;
+    if (hits) w += 0.3 * Math.min(hits, 3);
+    if (w >= 0.6) f.set(m.name, w);
+  });
+  if (!f.size) {   // no evidence: infer so that everybody belongs to a method group (weak weight)
+    const hit = METHOD_FROM_TAG.find(([t]) => p.tagSet.has(t));
+    f.set(hit ? hit[1] : METHOD_FROM_CML[p.cml_themes[0]] || "Modelling & scenarios", 0.6);
+  }
+  return p._mf = f;
+}
+// Extra field-cluster memberships on top of the computed ones (person -> field names).
+const FIELD_EXTRA = { "Franco Donati": ["Products & technology"], "Martina Vijver": ["Wildlife & conservation"],
+  "Valerio Barbarossa": ["Water & aquatic systems"], "Patrik Henriksson": ["Water & aquatic systems"] };   // Vijver: effects on species and ecosystems
+const FEAT_W = { tag: 1, kw: 0.7, cml: 0.35 };
+function personFeatures(p, mode) {
+  const f = new Map();
+  if (mode === "method") methodFeatures(p).forEach((w, k) => f.set("m:" + k, w));
+  else {
+    p.tagSet.forEach(t => f.set("tag:" + t, FEAT_W.tag));
+    p.kwSet.forEach(k => { if (!GENERIC.has(k.toLowerCase())) f.set("kw:" + k, FEAT_W.kw); });
+  }
+  p.cml_themes.forEach((t, i) => f.set("cml:" + t, FEAT_W.cml * (i ? 0.6 : 1)));   // faint signal so people with little evidence still find a group
+  return f;
+}
+function assignNames(clusters, items, score) {
+  const taken = new Set(), pairs = [], done = new Set();
+  clusters.forEach(c => items.forEach(it => {
+    let sc = 0; c.people.forEach(p => { sc += score(p, it); });
+    if (sc > 0) pairs.push([sc / Math.sqrt(c.people.length), c, it]);
+  }));
+  pairs.sort((a, b) => b[0] - a[0]).forEach(([, c, it]) => { if (done.has(c) || taken.has(it.name)) return; done.add(c); taken.add(it.name); c.name = c.short = it.name; });
+}
+const fieldScore = (p, f) => f.tags.filter(t => p.tagSet.has(t)).length + 0.5 * f.kws.filter(k => p.kwSet.has(k)).length;
+const methodScore = (p, m) => methodFeatures(p).get(m.name) || 0;
+
+// Method clusters are not discovered but named up front: each person goes to the method they show most evidence for, and
+// also joins any other method that is nearly as strong (so e.g. an LCA person who also builds models sits in both).
+function buildMethodGraph(nodes) {
+  const prim = new Map(), order = METHODS.map(m => m.name);
+  nodes.forEach(n => {
+    const f = [...methodFeatures(n.person).entries()].sort((a, b) => b[1] - a[1] || order.indexOf(a[0]) - order.indexOf(b[0]));
+    n.mnames = [f[0][0]].concat(f.slice(1).filter(([, w]) => w >= 0.6 * f[0][1] && w >= 0.9).slice(0, 2).map(([k]) => k));
+    if (METHOD_OVERRIDES[n.person.name]) n.mnames = METHOD_OVERRIDES[n.person.name].slice();   // manual lists are taken as given
+    if (n.mnames.includes("Molecular & eDNA") && !n.mnames.includes("Field & experimental work")) n.mnames.push("Field & experimental work");   // eDNA / genetic work is field-based
+    prim.set(n.id, n.mnames[0]);
+  });
+  // clusters with only 1-2 primary people are folded into the method their people show most evidence for (ties: the larger cluster)
+  for (let guard = 0; guard < 20; guard++) {
+    const cnt = new Map(); nodes.forEach(n => cnt.set(n.mnames[0], (cnt.get(n.mnames[0]) || 0) + 1));
+    if (cnt.size < 2) break;
+    const [small] = [...cnt.entries()].filter(([, c]) => c < 3).sort((x, y) => x[1] - y[1])[0] || [];
+    if (!small) break;
+    const mine = nodes.filter(n => n.mnames[0] === small);
+    const target = [...cnt.keys()].filter(m => m !== small)
+      .map(m => [m, mine.reduce((a, n) => a + (methodFeatures(n.person).get(m) || 0), 0) + 0.01 * cnt.get(m)]).sort((x, y) => y[1] - x[1])[0][0];
+    nodes.forEach(n => { n.mnames = [...new Set(n.mnames.map(m => (m === small ? target : m)))]; });
+  }
+  const names = order.filter(m => nodes.some(n => n.mnames[0] === m)).sort((a, b) => nodes.filter(n => n.mnames[0] === b).length - nodes.filter(n => n.mnames[0] === a).length);
+  const clusters = names.map((name, i) => ({ id: i, name, short: name, color: PALETTE[i % PALETTE.length], nodes: nodes.filter(n => n.mnames[0] === name) }));
+  const byName = new Map(clusters.map(c => [c.name, c]));
+  nodes.forEach(n => { n.cluster = byName.get(n.mnames[0]); n.memberships = n.mnames.map(m => byName.get(m)).filter(Boolean); n.deg = 0; });
+  clusters.forEach(c => {
+    c.members = nodes.filter(n => n.memberships.includes(c)); c.people = c.members.map(n => n.person);
+    c.ie = c.people.filter(p => p.field === "industrial_ecology").length; c.eb = c.people.length - c.ie;
+  });
+  const links = [];
+  for (let a = 0; a < nodes.length; a++) for (let b = a + 1; b < nodes.length; b++) {
+    const fa = methodFeatures(nodes[a].person), fb = methodFeatures(nodes[b].person); let w = 0;
+    fa.forEach((x, k) => { if (fb.has(k)) w += Math.min(x, fb.get(k)); });
+    if (w >= 0.8) links.push({ s: nodes[a], t: nodes[b], w: Math.min(w, 3), virtual: w < 1.6, cross: nodes[a].cluster !== nodes[b].cluster });
+  }
+  ringOrder(clusters);
+  return { nodes, links, clusters };
+}
+
+// Cluster modes compare people on shared features (cosine similarity, rarity-weighted), link each person to their nearest
+// neighbours, find communities, and make sure everyone has a primary cluster. People can ALSO belong to other clusters
+// they are nearly as close to (halos overlap, like the CML themes).
+function buildClusterGraph(nodes, mode) {
+  const N = people.length, df = new Map(), feats = new Map();
+  people.forEach(p => personFeatures(p, mode).forEach((_, k) => df.set(k, (df.get(k) || 0) + 1)));
+  const idf = k => Math.log((N + 1) / ((df.get(k) || 0) + 0.5));
+  const vec = new Map(nodes.map(n => {
+    const f = personFeatures(n.person, mode), v = new Map(); let norm = 0;
+    f.forEach((w, k) => { const x = w * idf(k); v.set(k, x); norm += x * x; });
+    norm = Math.sqrt(norm) || 1; v.forEach((x, k) => v.set(k, x / norm));
+    feats.set(n.id, f); return [n.id, v];
+  }));
+  const sim = (a, b) => { let d = 0; const va = vec.get(a.id), vb = vec.get(b.id), small = va.size < vb.size ? va : vb, big = small === va ? vb : va; small.forEach((x, k) => { const y = big.get(k); if (y) d += x * y; }); return d; };
+  const S = nodes.map(a => nodes.map(b => (a === b ? 0 : sim(a, b))));
+  const keep = new Set();
+  nodes.forEach((_, i) => {
+    S[i].map((v, j) => [v, j]).filter(([v]) => v >= 0.1).sort((x, y) => y[0] - x[0]).slice(0, 5).forEach(([, j]) => keep.add(i < j ? i + "," + j : j + "," + i));
+  });
+  const links = [...keep].map(k => { const [i, j] = k.split(",").map(Number); return { s: nodes[i], t: nodes[j], w: S[i][j] * 6, virtual: S[i][j] < 0.25 }; });
+  const found = findClusters(nodes, links, new Map());
+  const idx = new Map(nodes.map((n, i) => [n, i]));
+  const groups = found.map(c => c.nodes.slice());
+  const meanSim = (n, g) => g.reduce((a, m) => a + S[idx.get(n)][idx.get(m)], 0) / (g.length || 1);
+  const assigned = new Set(groups.flat());
+  nodes.filter(n => !assigned.has(n)).forEach(n => {
+    let best = -1, bs = -1; groups.forEach((g, i) => { const v = meanSim(n, g); if (v > bs) { bs = v; best = i; } });
+    if (best >= 0) groups[best].push(n); else groups.push([n]);
+  });
+  for (let guard = 0; guard < 20; guard++) {   // fold clusters of fewer than 3 into their most similar neighbour
+    const small = groups.findIndex(g => g.length < 3 && groups.length > 1);
+    if (small < 0) break;
+    const g = groups[small]; let best = -1, bs = -1;
+    groups.forEach((h, i) => { if (i === small) return; const v = g.reduce((a, n) => a + meanSim(n, h), 0) / g.length; if (v > bs) { bs = v; best = i; } });
+    groups[best].push(...g); groups.splice(small, 1);
+  }
+  groups.sort((a, b) => b.length - a.length);
+  const clusters = groups.map((g, i) => {
+    const c = { id: i, nodes: g, color: PALETTE[i % PALETTE.length] };
+    g.forEach(n => { n.cluster = c; });
+    return c;
+  });
+  // multiple membership: affinity = mean of the 3 closest members; join clusters at >= 75% of the primary affinity
+  const affinity = (n, c) => { const v = c.nodes.filter(m => m !== n).map(m => S[idx.get(n)][idx.get(m)]).sort((x, y) => y - x).slice(0, 3); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
+  nodes.forEach(n => {
+    const prim = affinity(n, n.cluster);
+    n.memberships = [n.cluster].concat(clusters.filter(c => c !== n.cluster).map(c => [c, affinity(n, c)])
+      .filter(([, a]) => a >= 0.15 && a >= 0.75 * prim).sort((x, y) => y[1] - x[1]).slice(0, 2).map(([c]) => c));
+  });
+  clusters.forEach(c => {
+    c.members = nodes.filter(n => n.memberships.includes(c));
+    c.people = c.members.map(n => n.person);
+    c.ie = c.people.filter(p => p.field === "industrial_ecology").length; c.eb = c.people.length - c.ie;
+    const cnt = new Map(); c.members.forEach(n => feats.get(n.id).forEach((_, k) => { if (!k.startsWith("cml:")) cnt.set(k, (cnt.get(k) || 0) + 1); }));
+    const sc = ([k, n]) => (n >= 2 ? n / c.members.length * idf(k) * (k.startsWith("tag:") || k.startsWith("m:") ? 1.25 : 1) : 0);
+    const top = [...cnt.entries()].sort((x, y) => sc(y) - sc(x)).slice(0, 2).map(([k]) => k.replace(/^(tag|kw|m):/, ""));
+    c.name = top.join(" · ") || "Cluster"; c.short = top[0] || "Cluster";
+  });
+  if (mode === "method") assignNames(clusters, METHODS, methodScore); else assignNames(clusters, FIELD_NAMES, fieldScore);
+  if (mode !== "method") Object.entries(FIELD_EXTRA).forEach(([person, extra]) => {   // manual extra field memberships
+    const n = nodes.find(x => x.person.name === person); if (!n) return;
+    extra.forEach(name => {
+      let c = clusters.find(x => x.name === name);
+      if (!c) {   // the named field did not form on its own: create it from the manually assigned people
+        c = { id: clusters.length, name, short: name, color: PALETTE[clusters.length % PALETTE.length], nodes: [], members: [], people: [], ie: 0, eb: 0 };
+        clusters.push(c);
+      }
+      if (!n.memberships.includes(c)) { n.memberships.push(c); c.members.push(n); c.people.push(n.person); if (n.person.field === "industrial_ecology") c.ie++; else c.eb++; }
+    });
+  });
+  if (mode === "method") clusters.forEach(c => { if (!METHODS.some(m => m.name === c.name)) c.name = c.short = "Methods not specified"; });   // people without method evidence in their profile
+  nodes.forEach(n => { n.deg = 0; });
+  links.forEach(l => { l.cross = l.s.cluster !== l.t.cluster; });
+  ringOrder(clusters);
+  return { nodes, links, clusters };
+}
+
+// People map. "CML theme" mode: one node per person, grouped by primary CML theme. "Cluster" mode: the network is built
+// from shared harmonized tags only, and clusters are found on that network.
+const mkPersonNode = p => ({ id: p.name, count: 1, person: p, people: [p], ie: p.field === "industrial_ecology" ? 1 : 0, eb: p.field === "industrial_ecology" ? 0 : 1 });
+// Field/method clusters are computed ONCE on everybody (cached per grouping + detail level); filters only decide who is shown.
+// Clustering the filtered subset instead would merge small groups into whatever is left (e.g. everyone into "Life cycle assessment").
+const fullGraphs = new Map();
+function fullClusterGraph(mode) {
+  const key = mode + ":" + state.resolution;
+  if (!fullGraphs.has(key)) {
+    const all = people.map(mkPersonNode);
+    const g = mode === "method" ? buildMethodGraph(all) : buildClusterGraph(all, "field");
+    g.clusters.forEach(c => { c.ringN = g.clusters.length; });
+    g.nodes.forEach(n => { n.c0 = n.cluster; });
+    fullGraphs.set(key, g);
+  }
+  return fullGraphs.get(key);
+}
+function subsetClusterGraph(full, list) {
+  const keep = new Set(list), nodes = full.nodes.filter(n => keep.has(n.person));
+  const copies = new Map();
+  const clusters = full.clusters.map(c => {
+    const members = c.members.filter(n => keep.has(n.person));
+    const people_ = members.map(n => n.person), ie = people_.filter(p => p.field === "industrial_ecology").length;
+    const c2 = { ...c, nodes: c.nodes.filter(n => keep.has(n.person)), members, people: people_, ie, eb: people_.length - ie, halo: undefined };
+    copies.set(c, c2); return c2;
+  }).filter(c => c.members.length);
+  clusters.forEach((c, i) => { c.id = i; });
+  nodes.forEach(n => { n.cluster = copies.get(n.c0); });
+  const ids = new Set(nodes.map(n => n.id));
+  return { nodes, links: full.links.filter(l => ids.has(l.s.id) && ids.has(l.t.id)), clusters };
+}
+function buildPeopleGraph(list) {
+  const byTheme = cmlGrouped();
+  if (!byTheme) return subsetClusterGraph(fullClusterGraph(state.colorBy === "method" ? "method" : "field"), list);
+  const nodes = list.map(mkPersonNode);
+  const links = [];
+  for (let a = 0; a < nodes.length; a++) for (let b = a + 1; b < nodes.length; b++) {
+    const A = nodes[a].person, B = nodes[b].person;
+    let w = 0;
+    A.tagSet.forEach(x => { if (B.tagSet.has(x)) w += 1; });
+    A.kwSet.forEach(x => { if (B.kwSet.has(x)) w += 0.5; });
+    if (w >= 1.5) links.push({ s: nodes[a], t: nodes[b], w, virtual: w < 2.5, cross: groupTheme(A) !== groupTheme(B) });  // weak or cross-theme links shape the layout but are not drawn
+  }
+  const clusters = CML_ORDER.map(name => ({ name, color: cmlColor(name), nodes: nodes.filter(n => groupTheme(n.person) === name) }))
+    .filter(c => c.nodes.length).map((c, i) => {
+      c.id = i; c.nodes.forEach(n => { n.cluster = c; });
+      // halos may overlap: a theme's halo also encloses people who list it as a secondary theme
+      c.members = nodes.filter(n => n.person.cml_themes.includes(c.name) && (!state.cml.size || state.cml.has(c.name) || groupTheme(n.person) === c.name));
+      c.people = c.members.map(n => n.person);
+      c.ie = c.people.filter(p => p.field === "industrial_ecology").length; c.eb = c.people.length - c.ie;
+      return c;
+    });
+  return { nodes, links, clusters };
+}
+
+// "Lines: co-authorship": the drawn lines (and the pull between people) become papers written together at Leiden.
+function withLines(g) {
+  if (state.lines !== "coauthor" || !NET) return g;
+  const byPerson = new Map(g.nodes.map(n => [n.person.id, n])), links = [];
+  NET.edges.forEach(([a, b, n]) => {
+    const A = byPerson.get(a), B = byPerson.get(b);
+    if (A && B) links.push({ s: A, t: B, w: Math.min(n, 6) / 2, papers: n, coauthor: true,
+                             cross: cmlGrouped() && groupTheme(A.person) !== groupTheme(B.person) });
+  });
+  return { ...g, links };
+}
+function buildGraph(list) {
+  if (state.view === "people") return withLines(buildPeopleGraph(list));
+  const counts = new Map(), depCounts = new Map(), pairs = new Map(), who = new Map();
+  list.forEach(p => {
+    const items = [...new Set(itemsOf(p))];
+    items.forEach(i => {
+      counts.set(i, (counts.get(i) || 0) + 1);
+      const d = depCounts.get(i) || {}; d[p.field] = (d[p.field] || 0) + 1; depCounts.set(i, d);
+      (who.get(i) || who.set(i, []).get(i)).push(p);
+    });
+    for (let a = 0; a < items.length; a++) for (let b = a + 1; b < items.length; b++) {
+      const key = items[a] < items[b] ? items[a] + "\u0000" + items[b] : items[b] + "\u0000" + items[a];
+      pairs.set(key, (pairs.get(key) || 0) + 1);
+    }
+  });
+  const nodes = [...counts.entries()].filter(([, n]) => n >= state.minCount).map(([id, n]) => {
+    const d = depCounts.get(id);
+    return { id, count: n, ie: d.industrial_ecology || 0, eb: d.environmental_biology || 0, people: who.get(id) };
+  });
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  // Keyword view: keywords that belong to the same curated theme are also pulled together (invisible links),
+  // otherwise one-person keywords form one cluster per person instead of per topic.
+  const virtual = new Set();
+  if (state.view === "keywords") {
+    const byTheme = new Map();
+    nodes.forEach(n => (TAX.keywordThemes[n.id] || []).forEach(t => (byTheme.get(t) || byTheme.set(t, []).get(t)).push(n.id)));
+    byTheme.forEach(ids => ids.sort().forEach((x, i) => ids.slice(i + 1).forEach(y => {
+      const key = x + "\u0000" + y;
+      if (!pairs.has(key)) virtual.add(key);
+      pairs.set(key, (pairs.get(key) || 0) + THEME_LINK);
+    })));
+  }
+  const links = [];
+  pairs.forEach((w, key) => {
+    const [a, b] = key.split("\u0000");
+    if (byId.has(a) && byId.has(b)) links.push({ s: byId.get(a), t: byId.get(b), w, virtual: virtual.has(key) });
+  });
+  nodes.forEach(n => { n.cmlTheme = cmlOfNode(n); });
+  if (state.colorBy === "cml") {   // clusters are the CML themes themselves
+    const clusters = CML_ORDER.map(name => ({ name, color: cmlColor(name), nodes: nodes.filter(n => n.cmlTheme === name).sort((a, b) => b.count - a.count) }))
+      .filter(c => c.nodes.length).map((c, i) => {
+        c.id = i; c.nodes.forEach(n => { n.cluster = c; });
+        c.people = [...new Set(c.nodes.flatMap(n => n.people))];
+        c.ie = c.people.filter(p => p.field === "industrial_ecology").length; c.eb = c.people.length - c.ie;
+        return c;
+      });
+    return { nodes, links, clusters };
+  }
+  return { nodes, links, clusters: findClusters(nodes, links, docFreq()) };
+}
+
+// Louvain-style modularity clustering on cosine-normalised co-occurrence, so hub items don't swallow everything.
+// state.resolution > 1 gives more, smaller clusters.
+function findClusters(nodes, links, df) {
+  const idx = new Map(nodes.map((n, i) => [n.id, i]));
+  const adj = nodes.map(() => new Map());
+  links.forEach(l => {
+    l.nw = l.w / Math.sqrt(l.s.count * l.t.count);
+    const i = idx.get(l.s.id), j = idx.get(l.t.id);
+    adj[i].set(j, l.nw); adj[j].set(i, l.nw);
+  });
+  const k = adj.map(m => [...m.values()].reduce((a, b) => a + b, 0));
+  const m2 = k.reduce((a, b) => a + b, 0);
+  const comm = nodes.map((_, i) => i);
+  if (m2 > 0) {
+    const tot = k.slice(), gamma = state.resolution;
+    for (let pass = 0; pass < 30; pass++) {
+      let moved = false;
+      for (let i = 0; i < nodes.length; i++) {
+        const cur = comm[i], w = new Map();
+        adj[i].forEach((wt, j) => w.set(comm[j], (w.get(comm[j]) || 0) + wt));
+        tot[cur] -= k[i];
+        let best = cur, bestGain = (w.get(cur) || 0) - gamma * tot[cur] * k[i] / m2;
+        w.forEach((wc, c) => {
+          const gain = wc - gamma * tot[c] * k[i] / m2;
+          if (gain > bestGain + 1e-12) { best = c; bestGain = gain; }
+        });
+        tot[best] += k[i];
+        if (best !== cur) { comm[i] = best; moved = true; }
+      }
+      if (!moved) break;
+    }
+  }
+  const groups = new Map();
+  nodes.forEach((n, i) => (groups.get(comm[i]) || groups.set(comm[i], []).get(comm[i])).push(n));
+  const clusters = [...groups.values()].filter(g => g.length > 1)
+    .sort((a, b) => b.reduce((s, n) => s + n.count, 0) - a.reduce((s, n) => s + n.count, 0))
+    .map((g, i) => ({ id: i, nodes: g.sort((a, b) => b.count - a.count), color: PALETTE[i % PALETTE.length] }));
+  clusters.forEach(c => c.nodes.forEach(n => { n.cluster = c; n.deg = 0; }));
+  links.forEach(l => { if (l.s.cluster && l.s.cluster === l.t.cluster) { l.s.deg += l.nw; l.t.deg += l.nw; } });
+  const N = people.length;
+  clusters.forEach(c => {
+    // name = the items that are central to the cluster but not common across the whole department (TF-IDF style)
+    const score = n => (n.deg + 0.3) * Math.log((N + 1) / ((df.get(n.id) || 0) + 0.5)) * (GENERIC.has(n.id.toLowerCase()) ? 0.2 : 1);
+    c.name = [...c.nodes].sort((a, b) => score(b) - score(a)).slice(0, 2).map(n => n.id).join(" · ");
+    c.people = [...new Set(c.nodes.flatMap(n => n.people))];
+    c.ie = c.people.filter(p => p.field === "industrial_ecology").length;
+    c.eb = c.people.length - c.ie;
+  });
+  return clusters;
+}
+
+/* ---------- force simulation (grid-accelerated repulsion, no clamping; the view is fitted afterwards) ---------- */
+const sim = { nodes: [], links: [], W: 900, H: 560, alpha: 0, raf: 0, linkK: 1 };
+const CELL = 150;
+
+function step(alpha) {
+  const N = sim.nodes, W = sim.W, H = sim.H, grid = new Map();
+  N.forEach(n => {
+    const key = Math.floor(n.x / CELL) + "," + Math.floor(n.y / CELL);
+    (grid.get(key) || grid.set(key, []).get(key)).push(n);
+  });
+  N.forEach(a => {
+    const cx = Math.floor(a.x / CELL), cy = Math.floor(a.y / CELL);
+    for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) {
+      const bucket = grid.get(gx + "," + gy);
+      if (!bucket) continue;
+      for (const b of bucket) {
+        if (b.i <= a.i) continue;
+        let dx = a.x - b.x, dy = a.y - b.y; const d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2), minD = a.r + b.r + 14;
+        const f = ((sim.people ? (sim.linkK < 1 ? 26000 : 16000) : 5200) / d2 + (d < minD ? (minD - d) * 0.5 : 0)) * alpha;   // people map: more room per node
+        dx /= d; dy /= d; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+      }
+    }
+  });
+  sim.links.forEach(l => {
+    const dx = l.t.x - l.s.x, dy = l.t.y - l.s.y, d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+    const across = l.s.cluster && l.t.cluster && l.s.cluster !== l.t.cluster ? 0.15 : 1;   // links between themes must not pull clusters together
+    const target = 70 + 40 / l.w, f = (d - target) * 0.02 * Math.min(l.w, 3) * alpha * sim.linkK * across;
+    l.s.vx += dx / d * f; l.s.vy += dy / d * f; l.t.vx -= dx / d * f; l.t.vy -= dy / d * f;
+  });
+  N.forEach(n => {
+    if (n.fixed) { n.vx = n.vy = 0; return; }
+    if (n.ax !== undefined) { n.vx += (n.ax - n.x) * 0.16 * alpha; n.vy += (n.ay - n.y) * 0.16 * alpha; }
+    else { n.vx += (W / 2 - n.x) * 0.008 * alpha * (900 / W); n.vy += (H / 2 - n.y) * 0.012 * alpha * (560 / H); }
+    n.x += Math.max(-12, Math.min(12, n.vx)); n.y += Math.max(-12, Math.min(12, n.vy));
+    n.vx *= 0.6; n.vy *= 0.6;
+  });
+}
+
+function layout(g, W, H) {
+  const N = g.nodes;
+  cancelAnimationFrame(sim.raf); sim.raf = 0; sim.alpha = 0;
+  let known = 0;
+  N.forEach((n, i) => {
+    const p = positions.get(n.id);
+    if (n.person) { const a = cmlGrouped() ? personAnchor(n.person, W, H) : clusterAnchor(n, g.clusters, W, H); n.ax = a.x; n.ay = a.y; }
+    if (p) { n.x = p.x; n.y = p.y; known++; }
+    else if (n.person) { n.x = n.ax + 40 * Math.cos(i * 2.399) * Math.sqrt(i % 9 + 1) / 3; n.y = n.ay + 40 * Math.sin(i * 2.399) * Math.sqrt(i % 9 + 1) / 3; }
+    else { n.x = W / 2 + 220 * Math.cos(i * 2.399) * Math.sqrt((i + 1) / N.length); n.y = H / 2 + 200 * Math.sin(i * 2.399) * Math.sqrt((i + 1) / N.length); }
+    n.vx = n.vy = 0; n.i = i; n.r = n.person ? 12 : 6 + 3.2 * Math.sqrt(n.count);
+  });
+  Object.assign(sim, { nodes: N, links: g.links, W, H, people: state.view === "people", linkK: cmlGrouped() ? 0.1 : state.view === "people" ? 0.4 : 1 });
+  const iters = N.length > 120 ? 220 : 320, a0 = known > N.length * 0.6 ? 0.4 : 1;
+  for (let it = 0; it < iters; it++) step(a0 * (1 - it / iters));
+  N.forEach(n => positions.set(n.id, { x: n.x, y: n.y }));
+}
+
+function reheat(a = 0.3) {
+  sim.alpha = Math.max(sim.alpha, a);
+  if (!sim.raf) sim.raf = requestAnimationFrame(tick);
+}
+function tick() {
+  sim.raf = 0;
+  step(sim.alpha); sim.alpha *= 0.94; placeAll();
+  if (sim.alpha > 0.02) sim.raf = requestAnimationFrame(tick);
+  else sim.nodes.forEach(n => positions.set(n.id, { x: n.x, y: n.y }));
+}
+
+/* ---------- view (zoom / pan) ---------- */
+const view = { k: 1, x: 0, y: 0, W: 900, H: 560 };
+function applyView() {
+  $("vp").setAttribute("transform", `translate(${view.x.toFixed(2)},${view.y.toFixed(2)}) scale(${view.k.toFixed(4)})`);
+  $("svg").style.setProperty("--inv", (1 / view.k).toFixed(4));
+}
+function fit() {
+  const N = graph.nodes, { W, H } = view;
+  if (!N.length) { Object.assign(view, { k: 1, x: 0, y: 0 }); applyView(); return; }
+  const fl = focusLabels(), pad = 24;
+  let k = 1;
+  for (let pass = 0; pass < 3; pass++) {   // labels are constant screen size, so their world width depends on k
+    const lw = n => labelShown(n, fl) ? (labelOf(n).length * 5.8 + 8) / k : 0;
+    let x0 = Math.min(...N.map(n => n.x - n.r)), x1 = Math.max(...N.map(n => n.x + n.r + lw(n)));
+    let y0 = Math.min(...N.map(n => n.y - n.r - 6 / k)), y1 = Math.max(...N.map(n => n.y + n.r + 6 / k));
+    if (state.view === "people") graph.clusters.forEach(c => {
+      const h = haloGeom(c); x0 = Math.min(x0, h.cx - h.rx); x1 = Math.max(x1, h.cx + h.rx); y0 = Math.min(y0, h.cy - h.ry); y1 = Math.max(y1, h.cy + h.ry);
+    });
+    // people map: reserve screen margin for the halo labels, which sit outside the coloured areas
+    const padX = state.view === "people" ? 150 : pad, padY = state.view === "people" ? 40 : pad;
+    k = Math.min((W - 2 * padX) / Math.max(x1 - x0, 1), (H - 2 * padY) / Math.max(y1 - y0, 1), 2.5);
+    view.k = k; view.x = W / 2 - (x0 + x1) / 2 * k; view.y = H / 2 - (y0 + y1) / 2 * k;
+  }
+  applyView();
+  if (state.view === "people") placeAll();   // halo labels are placed relative to the visible area
+}
+function svgPoint(e) {
+  const svg = $("svg"), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+function zoomAt(px, py, f) {
+  const nk = Math.max(0.3, Math.min(8, view.k * f)), r = nk / view.k;
+  view.x = px - (px - view.x) * r; view.y = py - (py - view.y) * r; view.k = nk; applyView();
+}
+
+/* ---------- rendering the graph (keyed DOM: elements are reused between renders) ---------- */
+const els = { nodes: new Map(), edges: new Map() };
+function haloGeom(c) {   // smooth closed outline around the members, padded so nodes and labels sit inside
+  const ms = c.members || c.nodes, pad = 24, pts = [];
+  ms.forEach(n => { for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; pts.push([n.x + Math.cos(a) * (n.r + pad), n.y + Math.sin(a) * (n.r + pad)]); } });
+  pts.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = arr => { const h = []; arr.forEach(p => { while (h.length > 1 && cross(h[h.length - 2], h[h.length - 1], p) <= 0) h.pop(); h.push(p); }); h.pop(); return h; };
+  const hull = half(pts).concat(half(pts.slice().reverse()));
+  const m = hull.length, mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  let d = `M${mid(hull[m - 1], hull[0]).map(v => v.toFixed(1))}`;
+  hull.forEach((p, i) => { const q = mid(p, hull[(i + 1) % m]); d += `Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${q[0].toFixed(1)},${q[1].toFixed(1)}`; });
+  const xs = hull.map(p => p[0]), ys = hull.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return { poly: hull, d: d + "Z", cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, rx: (x1 - x0) / 2, ry: (y1 - y0) / 2, top: y0 };
+}
+const labelShown = (n, fl) => state.allLabels || n.count >= 2 || (n.person && graph.nodes.length <= 70) || (fl && fl.has(n.id)) || graph.nodes.length <= 40;
+function focusLabels() { return state.focus ? new Set(state.focus.labels) : null; }
+const areaOf = id => { const th = state.view === "tags" ? [id] : (TAX.keywordThemes[id] || []); return th.length ? TAX.themeArea[th[0]] : null; };
+const areaColor = n => TAX.areas[areaOf(n.id)] || "#bbb";
+const deptColor = n => n.ie >= n.eb ? COLORS.industrial_ecology : COLORS.environmental_biology;   // people belong to one department; items take the one with most people (ties: IE)
+
+
+// Halo labels sit just outside the coloured area, on the side of the cluster that is free of other halos and labels.
+const LABEL_H = 18;
+function labelBox(c, k) {   // screen-size label, so its world size shrinks as the view zooms in
+  const w = ((ICONS[c.name] ? 22 : 0) + (c.short || c.name).length * 7.4 + 34) / k;
+  return w;
+}
+function placeLabels(k) {
+  const cl = graph.clusters.filter(c => c.halo), geo = new Map(cl.map(c => [c, haloGeom(c)])), boxes = [];
+  const all = graph.nodes, gx = all.reduce((a, n) => a + n.x, 0) / all.length, gy = all.reduce((a, n) => a + n.y, 0) / all.length;
+  const inside = (poly, x, y) => { let r = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) r = !r; } return r; };
+  cl.slice().sort((a, b) => b.nodes.length - a.nodes.length).forEach(c => {
+    const h = geo.get(c), w = labelBox(c, k), lh = LABEL_H / k;
+    let best = null;
+    for (let i = 0; i < 48; i++) {
+      const a = i * Math.PI / 24, ux = Math.cos(a), uy = Math.sin(a);
+      let t = 0;   // farthest ray/polygon crossing from the centre = where the halo edge is in this direction
+      for (let p = 0; p < h.poly.length; p++) {
+        const A = h.poly[p], B = h.poly[(p + 1) % h.poly.length], ex = B[0] - A[0], ey = B[1] - A[1], den = ux * ey - uy * ex;
+        if (Math.abs(den) < 1e-9) continue;
+        const tt = ((A[0] - h.cx) * ey - (A[1] - h.cy) * ex) / den, uu = ((A[0] - h.cx) * uy - (A[1] - h.cy) * ux) / den;
+        if (tt > 0 && uu >= 0 && uu <= 1) t = Math.max(t, tt);
+      }
+      const gap = 5 / k, px = h.cx + ux * (t + gap), py = h.cy + uy * (t + gap);
+      const x0 = ux > 0.35 ? px : ux < -0.35 ? px - w : px - w / 2, y0 = uy < 0 ? py - lh : py, box = [x0, y0, x0 + w, y0 + lh];
+      let pen = 0;
+      cl.forEach(o => { if (o !== c) {
+        const oh = geo.get(o);
+        [[box[0], box[1]], [box[2], box[1]], [box[0], box[3]], [box[2], box[3]], [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2]].forEach(([qx, qy]) => { if (inside(oh.poly, qx, qy)) pen += 3; });
+      } });
+      const vx0 = -view.x / view.k, vx1 = (view.W - view.x) / view.k, vy0 = -view.y / view.k, vy1 = (view.H - view.y) / view.k;
+      pen += 10 * (Math.max(0, vx0 - box[0]) + Math.max(0, box[2] - vx1) + Math.max(0, vy0 - box[1]) + Math.max(0, box[3] - vy1)) * k / 3;
+      boxes.forEach(b => { if (box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]) pen += 40; });
+      all.forEach(n => { if (n.x + n.r > box[0] && n.x - n.r < box[2] && n.y + n.r > box[1] && n.y - n.r < box[3]) pen += 7; });
+      pen += 0.8 * (1 - ((px - h.cx) * (px - gx) + (py - h.cy) * (py - gy)) / (Math.hypot(px - h.cx, py - h.cy) * Math.hypot(px - gx, py - gy) + 1e-6));   // prefer facing away from the middle
+      if (!best || pen < best.pen) best = { pen, px, py, ux, uy, box };
+    }
+    boxes.push(best.box); c.halo.pos = best;
+  });
+  return boxes;
+}
+
+function syncDom() {
+  const fl = focusLabels();
+  const ids = new Set(graph.nodes.map(n => n.id));
+  els.nodes.forEach((e, id) => { if (!ids.has(id)) { e.g.remove(); els.nodes.delete(id); } });
+  graph.nodes.forEach(n => {
+    let e = els.nodes.get(n.id);
+    if (!e) {
+      const g = svgEl("g"), c = svgEl("circle"), ring = svgEl("circle"), badges = svgEl("g"), t = svgEl("text");
+      g.setAttribute("class", "node"); g.setAttribute("tabindex", 0); g.setAttribute("role", "button"); ring.setAttribute("fill", "none"); ring.style.pointerEvents = "none"; t.setAttribute("x", 0); t.setAttribute("y", 4);
+      g.append(c, ring, badges, t); $("nodes").append(g);
+      e = { g, c, ring, badges, t }; els.nodes.set(n.id, e);
+    }
+    e.g.__n = n; n.el = e;
+    const sel = fl && fl.has(n.id);
+    e.g.setAttribute("class", `node${fl && !sel ? " dim" : ""}${sel ? " sel" : ""}`);
+    const clusterFill = n.cluster ? n.cluster.color : "#bbb";
+    e.g.setAttribute("aria-label", n.person ? `${n.id}: ${n.person.cml_themes.join(", ")}` : `${n.id}: ${n.count} people`);
+    const cmlFill = n.person ? cmlColor(groupTheme(n.person)) : cmlColor(n.cmlTheme);
+    e.c.setAttribute("r", n.r.toFixed(1));
+    e.c.setAttribute("fill", state.colorBy === "cml" ? cmlFill : clusterFill);
+    e.c.setAttribute("stroke", "#fff"); e.c.setAttribute("stroke-width", 1.5);
+    // ring: department (cluster mode, single-department items only) or cluster (department mode)
+    const ringColor = null;   // department ring removed: items span departments, so it was misleading
+    if (ringColor) { e.ring.setAttribute("r", (n.r + 3).toFixed(1)); e.ring.setAttribute("stroke", ringColor); e.ring.setAttribute("stroke-width", 2.5); e.ring.style.display = ""; }
+    else e.ring.style.display = "none";
+    // people: a small icon per secondary theme, tucked against the node (bottom-right first, then bottom-left)
+    e.badges.innerHTML = n.person && !cmlGrouped()
+      ? (n.memberships || []).slice(1, 3).map((c, k) => {   // also belongs to these clusters: small dot in their colour
+          const bx = (k ? -1 : 1) * n.r * 0.8, by = n.r * 0.8;
+          return `<g transform="translate(${bx.toFixed(1)},${by.toFixed(1)})"><title>Also: ${esc(c.name)}</title><circle r="5" fill="${c.color}" stroke="#fff" stroke-width="1.5"/></g>`;
+        }).join("")
+      : n.person ? n.person.cml_themes.filter(c => c !== groupTheme(n.person)).slice(0, 2).map((c, k) => {
+      const bx = (k ? -1 : 1) * n.r * 0.8, by = n.r * 0.8, col = cmlColor(c);
+      return `<g transform="translate(${bx.toFixed(1)},${by.toFixed(1)})"><title>Also: ${esc(c)}</title><circle r="5.6" fill="#fff" stroke="${col}" stroke-width="1.3"/><g transform="translate(-4.3,-4.3) scale(.36)" fill="none" stroke="${col}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${ICONS[c]}</g></g>`;
+    }).join("") : "";
+    e.t.textContent = labelShown(n, fl) ? labelOf(n) : "";
+    if (state.view !== "people") e.t.setAttribute("x", (n.r + 4).toFixed(1));
+  });
+  const keys = new Set();
+  graph.links.filter(l => !l.virtual).forEach(l => {
+    const key = l.s.id + "\u0000" + l.t.id; keys.add(key);
+    let ln = els.edges.get(key);
+    if (!ln) { ln = svgEl("line"); $("edges").append(ln); els.edges.set(key, ln); }
+    l.el = ln;
+    ln.setAttribute("class", `edge${l.coauthor ? " coauthor" : ""}${fl && !(fl.has(l.s.id) && fl.has(l.t.id)) ? " dim" : ""}`);
+    ln.setAttribute("stroke-width", l.coauthor ? Math.min(0.8 + l.papers * 0.5, 6) : Math.min(1 + l.w, 6));
+    if (l.cross) ln.setAttribute("stroke-dasharray", "4 4"); else ln.removeAttribute("stroke-dasharray");
+  });
+  els.edges.forEach((ln, key) => { if (!keys.has(key)) { ln.remove(); els.edges.delete(key); } });
+  const hl = $("halos"); hl.innerHTML = "";
+  if (state.view === "people") graph.clusters.forEach(c => {
+    const g = svgEl("g"), ell = svgEl("path"), lab = svgEl("g");
+    g.setAttribute("class", "halo"); ell.setAttribute("fill", c.color); ell.setAttribute("fill-opacity", 0.08); ell.setAttribute("stroke-linejoin", "round"); ell.setAttribute("stroke", c.color);
+    ell.setAttribute("stroke-opacity", 0.5); ell.setAttribute("stroke-dasharray", "5 4"); ell.style.vectorEffect = "non-scaling-stroke";
+    lab.setAttribute("class", "halo-label");
+    const ic = ICONS[c.name];
+    lab.innerHTML = `${ic ? `<g class="hl-ic" fill="none" stroke="${c.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic}</g>` : ""}<text fill="${c.color}">${esc(c.short || c.name)} · ${c.people.length}</text>`;
+    lab.__c = c; lab.setAttribute("role", "button"); lab.setAttribute("tabindex", 0);
+    const tt = svgEl("title"); tt.textContent = "Click to highlight this group"; lab.append(tt);
+    g.append(ell, lab); hl.append(g); c.halo = { ell, lab };
+  });
+  $("emptyMsg").style.display = graph.nodes.length ? "none" : "flex";
+  const cmlLegend = CML_ORDER.map(c => `<span class="lg"><span style="color:${cmlColor(c)};display:inline-flex">${icon(c, 13)}</span>${esc(c)}</span>`).join("");
+  $("legend").innerHTML = "<span>" + (state.view === "people"
+    ? (cmlGrouped()
+      ? `Fill = ${state.cml.size ? "selected theme" : "primary CML theme"} · small icon = also works on that theme · dashed area = theme group · ${state.lines === "coauthor" ? "blue lines = papers written together, thicker = more (dashed = across themes)" : "lines = shared tags/keywords (dashed = across themes)"}`
+      : `Fill = primary ${state.colorBy} cluster · small dot = also belongs to that cluster · dashed areas may overlap · ${state.lines === "coauthor" ? "blue lines = papers written together" : "lines = " + (state.colorBy === "method" ? "shared methods" : "shared tags/keywords")}`)
+    : state.colorBy === "cml" ? `<span class="lgrow">${cmlLegend}<span class="lg">size = people · icon = CML theme</span></span>`
+    : `Fill = cluster · size = people`) + "</span>";
+}
+
+// Node names: greedy collision avoidance. Each name tries right, left, above, below; if none is free it is hidden (the tooltip
+// and the people list still show it). Cluster names are reserved first so person names never sit on top of them.
+function placeNodeLabels(reserved) {
+  const k = view.k, hh = 13 / k, fl = focusLabels(), placed = reserved.slice();
+  const hit = b => placed.some(p => b[0] < p[2] && b[2] > p[0] && b[1] < p[3] && b[3] > p[1]);
+  graph.nodes.filter(n => n.el).sort((a, b) => (fl && fl.has(b.id) ? 1 : 0) - (fl && fl.has(a.id) ? 1 : 0) || b.r - a.r).forEach(n => {
+    const t = n.el.t;
+    if (!labelShown(n, fl)) { t.style.display = "none"; return; }
+    const w = (labelOf(n).length * 5.8 + 4) / k, g = 4 / k, base = 0.35 * 11 / k;
+    const cands = [
+      { ax: "start", x: n.r + g, y: base, box: [n.x + n.r + g, n.y - hh / 2, n.x + n.r + g + w, n.y + hh / 2] },
+      { ax: "end", x: -(n.r + g), y: base, box: [n.x - n.r - g - w, n.y - hh / 2, n.x - n.r - g, n.y + hh / 2] },
+      { ax: "middle", x: 0, y: -(n.r + g + 2 / k), box: [n.x - w / 2, n.y - n.r - g - hh, n.x + w / 2, n.y - n.r - g] },
+      { ax: "middle", x: 0, y: n.r + g + hh * 0.8, box: [n.x - w / 2, n.y + n.r + g, n.x + w / 2, n.y + n.r + g + hh] },
+    ];
+    const c = cands.find(c => !hit(c.box));
+    if (!c) { t.style.display = "none"; return; }
+    placed.push(c.box); t.style.display = "";
+    t.setAttribute("text-anchor", c.ax); t.setAttribute("x", c.x.toFixed(1)); t.setAttribute("y", c.y.toFixed(1));
+  });
+}
+function placeAll() {
+  let reserved = [];
+  if (state.view === "people") reserved = placeLabels(view.k);
+  if (state.view === "people") graph.clusters.forEach(c => {
+    if (!c.halo) return;
+    const h = haloGeom(c);
+    c.halo.ell.setAttribute("d", h.d);
+    const p = c.halo.pos;
+    if (p) {
+      const w = labelBox(c, 1) , ox = p.ux > 0.35 ? 0 : p.ux < -0.35 ? -w : -w / 2, oy = p.uy < 0 ? -6 : 14, ic = ICONS[c.name] ? 22 : 0;
+      c.halo.lab.style.transform = `translate(${p.px.toFixed(1)}px,${p.py.toFixed(1)}px) scale(var(--inv,1))`;
+      const t = c.halo.lab.querySelector("text"), g = c.halo.lab.querySelector(".hl-ic");
+      t.setAttribute("x", (ox + ic).toFixed(1)); t.setAttribute("y", oy);
+      if (g) g.setAttribute("transform", `translate(${ox.toFixed(1)},${oy - 14}) scale(.7)`);
+    }
+  });
+  graph.nodes.forEach(n => n.el && n.el.g.setAttribute("transform", `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`));
+  if (state.view === "people") placeNodeLabels(reserved);
+  graph.links.forEach(l => {
+    if (!l.el || l.virtual) return;
+    l.el.setAttribute("x1", l.s.x.toFixed(1)); l.el.setAttribute("y1", l.s.y.toFixed(1));
+    l.el.setAttribute("x2", l.t.x.toFixed(1)); l.el.setAttribute("y2", l.t.y.toFixed(1));
+  });
+}
+
+function renderGraph(list) {
+  const narrow = window.matchMedia("(max-width:760px)").matches;
+  const wrap = $("graph-wrap"), svg = $("svg");
+  const W = narrow ? 560 : Math.max(700, Math.min(1800, Math.round(wrap.clientWidth || 900))), H = narrow ? 860 : Math.max(420, Math.min(900, Math.round(W * (wrap.clientHeight || 560) / (wrap.clientWidth || 900))));
+  const shape = narrow + ":" + Math.round(H / 60) + ":" + Math.round(W / 150);   // a clearly different panel shape needs a fresh layout
+  const grouping = state.view + ":" + (cmlGrouped() ? [...state.cml].sort().join("|") : state.colorBy);   // a new grouping needs a fresh layout
+  if (svg.dataset.narrow !== shape || svg.dataset.grouping !== grouping) { positions.clear(); svg.dataset.narrow = shape; svg.dataset.grouping = grouping; }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  view.W = W; view.H = H;
+  graph = buildGraph(list);
+  layout(graph, W, H);
+  syncDom(); placeAll(); fit();
+}
+
+function renderClusters() {
+  $("clusterSum").textContent = `Clusters · ${graph.clusters.length} (click one to highlight it on the map)`;
+  $("clusters").innerHTML = graph.clusters.map(c => {
+    const sel = state.focus && state.focus.kind === "cluster" && state.focus.id === c.id;
+    const tot = c.ie + c.eb || 1;
+    return `<div class="panel cluster ${sel ? "sel" : ""}" data-c="${c.id}" role="button" tabindex="0" style="border-left-color:${c.color}">
+      <b>${cmlGrouped() ? `<span style="color:${c.color}">${icon(c.name, 16)}</span> ` : ""}${esc(c.name)} <small>· ${c.people.length} people${state.view === "people" ? "" : ` · ${c.nodes.length} items`}</small></b>
+      <small>${(c.members || c.nodes).slice(0, 10).map(n => esc(n.id)).join(", ")}${(c.members || c.nodes).length > 10 ? "…" : ""}</small>
+      <div class="splitbar" title="${c.ie} industrial ecology · ${c.eb} environmental biology"><i style="width:${100 * c.ie / tot}%;background:${COLORS.industrial_ecology}"></i><i style="width:${100 * c.eb / tot}%;background:${COLORS.environmental_biology}"></i></div></div>`;
+  }).join("") || '<span class="mute">No clusters – lower “min. people per node” or relax the filters.</span>';
+}
+
+/* ---------- people ---------- */
+function snippet(p) {
+  if (!state.terms.length || !p.summary) return "";
+  const low = p.summary.toLowerCase(), hit = state.terms.map(t => low.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0];
+  if (hit === undefined) return "";
+  const from = Math.max(0, hit - 60), to = Math.min(p.summary.length, hit + 100);
+  let txt = esc(p.summary.slice(from, to));
+  state.terms.forEach(t => { txt = txt.replace(new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), m => `<mark>${m}</mark>`); });
+  return `<div class="snippet">${from ? "…" : ""}${txt}${to < p.summary.length ? "…" : ""}</div>`;
+}
+function renderCard() {
+  const el = $("card"), p = state.card;
+  if (!p || state.tab !== "map") { el.hidden = true; el.innerHTML = ""; return; }
+  const n = graph.nodes.find(x => x.person === p) || {};
+  const chip = (t, style = "") => `<span class="chip" style="${style}">${esc(t)}</span>`;
+  const themes = p.cml_themes.map(c => `<span class="chip" style="color:${cmlColor(c)}">${icon(c, 12)} ${esc(c)}</span>`).join("");
+  const groups = cmlGrouped() ? "" : `<h4>${state.colorBy === "method" ? "Method" : "Field"} clusters</h4><div class="row">${(n.memberships || []).map((c, i) => `<span class="chip" style="border-color:${c.color};color:${c.color}">${i ? "" : "● "}${esc(c.name)}</span>`).join("")}</div>`;
+  const bio = (p.summary || "").trim(), projects = (p.projects || []).slice(0, 4);
+  el.innerHTML = `<div class="chead"><img src="${esc(p.photo_url)}" alt="" onerror="this.style.visibility='hidden'">
+    <div><h3><a href="${esc(p.profile_url)}" target="_blank" rel="noopener">${esc(p.name)}</a></h3>
+    <div class="sub">${esc(p.rank || p.title || "")}</div><div class="sub">${esc(LABELS[p.field] || "")}${p.field_basis && p.field_basis !== "profile" ? ` <span title="Not on the university profile; from ${esc(p.field_basis)}">(inferred)</span>` : ""}</div></div>
+    <button class="cx" id="cardClose" aria-label="Close">×</button></div>
+    <h4>CML themes</h4><div class="row">${themes}</div>${groups}
+    ${p.themes.length ? `<h4>Tags</h4><div class="row">${p.themes.map(t => chip(t)).join("")}</div>` : ""}
+    ${p.kws.length ? `<h4>Keywords</h4><div class="row">${p.kws.map(k => chip(k)).join("")}</div>` : ""}
+    ${bio ? `<h4>About</h4><p class="bio">${esc(bio.length > 650 ? bio.slice(0, 650).replace(/\s+\S*$/, "") + "…" : bio)}</p>` : ""}
+    ${projects.length ? `<h4>Projects</h4><div class="bio">${projects.map(pr => `<div><a href="${esc(pr.url)}" target="_blank" rel="noopener">${esc(pr.title)}</a></div>`).join("")}</div>` : ""}
+    ${pubCard(p)}
+    <div style="margin-top:10px"><button class="btn" data-askabout="${esc(p.id)}">Ask about ${esc(p.name.split(" ")[0])}'s work</button></div>`;
+  el.hidden = false;
+}
+const papers = n => `${n} paper${n === 1 ? "" : "s"}`;
+const instName = i => (NET && NET.inst[i] ? NET.inst[i][0] : "");
+const countryName = cc => (WORLD && WORLD.names[cc]) || cc;
+function pubCard(p) {
+  const u = p.pub, co = (COAUTH.get(p.id) || []).filter(([q]) => byPid.has(q)).slice(0, 8);
+  if (!NET) return "";
+  if (!u.n) return `<h4>Publications</h4><div class="note">No publications found in OpenAlex${u.note ? ": " + esc(u.note) : " yet"}.</div>`;
+  return `<h4>Publications <span style="text-transform:none;letter-spacing:0">(OpenAlex, since 2010)</span></h4>
+    <div class="kpis"><div><b>${u.n}</b><span>papers</span></div><div><b>${u.n_cml}</b><span>at Leiden</span></div><div><b>${u.cites.toLocaleString("en")}</b><span>citations</span></div></div>
+    ${u.note ? `<div class="note">${esc(u.note)}</div>` : ""}
+    ${u.pkw.length ? `<h4>Paper keywords</h4><div class="row">${u.pkw.slice(0, 10).map(k => `<span class="chip" style="cursor:default">${esc(k)}</span>`).join("")}</div>` : ""}
+    ${co.length ? `<h4>Writes most with (CML)</h4><ul class="plist">${co.map(([q, n]) => `<li><button class="who" data-open="${esc(q)}">${esc(byPid.get(q).name)}</button><span class="n">${n}</span></li>`).join("")}</ul>` : ""}
+    ${u.partners.length ? `<h4>External partners</h4><ul class="plist">${u.partners.slice(0, 6).map(([i, n]) => `<li><span>${esc(instName(i))}</span><span class="n">${n}</span></li>`).join("")}</ul>` : ""}
+    ${u.countries.length ? `<h4>Partner countries</h4><div class="row">${u.countries.map(([c, n]) => `<span class="chip" style="cursor:default">${esc(countryName(c))} · ${n}</span>`).join("")}</div>` : ""}
+    <h4>Recent papers</h4><div>${u.papers.map(w => `<a class="paper" ${w.doi ? `href="${esc(w.doi)}" target="_blank" rel="noopener"` : ""}>${esc(w.t || "")}<small>${w.y || ""}${w.v ? " · " + esc(w.v) : ""}</small></a>`).join("")}</div>`;
+}
+function renderPeople(list) {
+  const fl = focusLabels();
+  let shown = list;
+  if (fl) shown = list.filter(p => itemsOf(p).some(i => fl.has(i)));
+  shown = [...shown].sort((a, b) => a.name.split(" ").slice(-1)[0].localeCompare(b.name.split(" ").slice(-1)[0]));
+  $("peopleCount").textContent = `(${shown.length})`;
+  $("focusBar").innerHTML = state.focus
+    ? `<div class="focus-bar"><span>Focus: <b>${esc(state.focus.title)}</b></span><button class="link" id="clearFocus" style="margin-left:auto">clear</button></div>` : "";
+  $("people").innerHTML = shown.map(p => {
+    const themes = p.themes.map(t => `<span role="button" tabindex="0" class="chip theme ${state.tags.has(t) ? "active" : ""} ${fl && fl.has(t) ? "hit" : ""}" data-tag="${esc(t)}" title="Filter by this tag">${esc(t)}</span>`).join("");
+    const kws = p.kws.map(k => `<span role="button" tabindex="0" class="chip ${state.kws.has(k) ? "active" : ""} ${fl && fl.has(k) ? "hit" : ""}" data-kw="${esc(k)}" title="Filter by this keyword">${esc(k)}</span>`).join("");
+    return `<div class="person ${fl && itemsOf(p).some(i => fl.has(i)) ? "hl" : ""}"><img src="${esc(p.photo_url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div><div class="name"><a href="${esc(p.profile_url)}" target="_blank" rel="noopener">${esc(p.name)}</a>
+        <span class="badge" style="background:${COLORS[p.field]}">${p.field === "industrial_ecology" ? "IE" : "EB"}</span>${p.cml_themes.map(c => `<span class="cmlbadge" style="color:${cmlColor(c)}" title="${esc(c)}">${icon(c, 15)}</span>`).join("")}</div>
+      <div class="mute">${esc(p.rank)}${p.title && !p.title.toLowerCase().startsWith((p.rank || "").toLowerCase()) ? " · " + esc(p.title) : ""}${p.pub.n ? ` · ${papers(p.pub.n)}` : ""}</div>
+      ${snippet(p)}<div>${themes}</div>${kws || p.summary ? `<details class="bio" ${fl && p.kws.some(k => fl.has(k)) ? "open" : ""}><summary>Keywords &amp; bio</summary>${kws ? `<div>${kws}</div>` : ""}${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</details>` : ""}</div></div>`;
+  }).join("") || '<p class="mute">Nobody matches the current filters.</p>';
+}
+
+/* ---------- active filters + shareable URL ---------- */
+function renderActive() {
+  const chips = [];
+  if (state.depts.size < Object.keys(LABELS).length) chips.push(["dept:*", "Department: " + [...state.depts].map(d => LABELS[d]).join(", ")]);
+  if (state.pos.size < POSITIONS.length) chips.push(["pos:*", "Position: " + [...state.pos].join(", ")]);
+  state.cml.forEach(c => chips.push(["cml:" + c, `Theme: ${c}`]));
+  state.tags.forEach(c => chips.push(["tag:" + c, `Tag: ${c}`]));
+  state.kws.forEach(c => chips.push(["kw:" + c, `Keyword: ${c}`]));
+  if (state.terms.length) chips.push(["q:", `Search: “${state.q.trim()}”`]);
+  $("activeFilters").innerHTML = chips.map(([k, txt]) => `<span class="chip" role="button" tabindex="0" data-rm="${esc(k)}" title="Remove this filter">${esc(txt)} ×</span>`).join("");
+}
+function saveHash() {
+  const u = new URLSearchParams();
+    if (state.q.trim()) u.set("q", state.q.trim());
+  if (state.cml.size) u.set("cml", [...state.cml].join("|"));
+  if (state.tags.size) u.set("tag", [...state.tags].join("|"));
+  if (state.kws.size) u.set("kw", [...state.kws].join("|"));
+  if (state.depts.size < Object.keys(LABELS).length) u.set("dept", [...state.depts].join("|"));
+  if (state.colorBy !== "cml") u.set("c", state.colorBy);
+  if (state.tab !== "map") u.set("tab", state.tab);
+  if (state.lines !== "topics") u.set("l", state.lines);
+  if (state.pos.size < POSITIONS.length) u.set("pos", [...state.pos].join("|"));
+  if (state.xq.trim()) u.set("x", state.xq.trim());
+  if (state.tagMode !== "any") u.set("tm", state.tagMode);
+  if (state.kwMode !== "any") u.set("km", state.kwMode);
+  if (state.minCount !== 1) u.set("min", state.minCount);
+  if (state.resolution !== 2) u.set("res", state.resolution);
+  try { history.replaceState(null, "", u.toString() ? "#" + u : location.pathname + location.search); } catch (e) { /* sandboxed preview */ }
+}
+function loadHash() {
+  const u = new URLSearchParams(location.hash.slice(1)), list = k => (u.get(k) || "").split("|").filter(Boolean);
+  
+  if (u.get("q")) { state.q = u.get("q"); state.terms = state.q.toLowerCase().split(/\s+/).filter(Boolean); $("q").value = state.q; }
+  list("cml").forEach(c => state.cml.add(c)); list("tag").forEach(c => state.tags.add(c)); list("kw").forEach(c => state.kws.add(c));
+  if (u.get("dept")) state.depts = new Set(list("dept").filter(d => LABELS[d]));
+  if (["cml", "field", "method"].includes(u.get("c"))) state.colorBy = u.get("c"); else if (u.get("c") === "cluster") state.colorBy = "field";
+  if (["map", "partners", "expertise", "ask"].includes(u.get("tab"))) state.tab = u.get("tab");
+  if (u.get("l") === "coauthor") state.lines = "coauthor";
+  if (u.get("pos")) state.pos = new Set(list("pos").filter(x => POSITIONS.includes(x)));
+  if (u.get("x")) { state.xq = u.get("x"); $("xq").value = state.xq; }
+  if (u.get("tm")) state.tagMode = u.get("tm");
+  if (u.get("km")) state.kwMode = u.get("km");
+  if (u.get("min")) { state.minCount = +u.get("min"); $("minCount").value = state.minCount; $("minCountVal").textContent = state.minCount; }
+  if (u.get("res")) { state.resolution = +u.get("res"); $("resolution").value = state.resolution; $("resolutionVal").textContent = state.resolution; }
+  markSeg("colorBy", "c", state.colorBy); markSeg("tagMode", "m", state.tagMode); markSeg("kwMode", "m", state.kwMode);
+  markSeg("lines", "l", state.lines); markSeg("tabs", "tab", state.tab);
+}
+
+/* ---------- external partners view ---------- */
+function partnerCounts(list) {
+  const ok = new Set(list.map(p => p.id)), inst = new Map(), cc = new Map();
+  let papers = 0;
+  NET.cw.forEach(([ppl, ins, ccs]) => {
+    const mine = ppl.filter(x => ok.has(x));
+    if (!mine.length) return;
+    papers++;
+    ins.forEach(i => {
+      const r = inst.get(i) || inst.set(i, { i, n: 0, who: new Map() }).get(i); r.n++;
+      mine.forEach(x => r.who.set(x, (r.who.get(x) || 0) + 1));
+    });
+    ccs.forEach(c => {
+      const r = cc.get(c) || cc.set(c, { cc: c, n: 0, who: new Map() }).get(c); r.n++;
+      mine.forEach(x => r.who.set(x, (r.who.get(x) || 0) + 1));
+    });
+  });
+  const byN = (a, b) => b.n - a.n;
+  return { papers, inst: [...inst.values()].sort(byN), cc: [...cc.values()].sort(byN), ccMap: cc };
+}
+function mix(a, b, t) {   // hex colours, t in 0..1
+  const h = x => [1, 3, 5].map(k => parseInt(x.slice(k, k + 2), 16)), A = h(a), B = h(b);
+  return "#" + A.map((v, k) => Math.round(v + (B[k] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+const whoList = m => `<ul class="plist">${[...m.entries()].sort((a, b) => b[1] - a[1]).map(([x, n]) =>
+  `<li><button class="who" data-open="${esc(x)}">${esc(byPid.get(x).name)}</button><span class="n">${papers(n)}</span></li>`).join("")}</ul>`;
+function renderPartners(list) {
+  if (!NET || !WORLD) { $("partnersPane").innerHTML = `<p class="pane-intro">No publication data in this build. Run harvest_openalex.py and build_network.py, then build_dashboard.py.</p>`; return; }
+  const v = partnerCounts(list), map = $("worldMap");
+  const vb = (WORLD.views || {})[state.mapView] || [0, 0, WORLD.w, WORLD.h];
+  map.setAttribute("viewBox", vb.join(" "));
+  if (!map.childElementCount) map.innerHTML = Object.entries(WORLD.shapes).map(([c, s]) => `<path data-cc="${esc(c)}" d="${s.d}"><title></title></path>`).join("");
+  const max = Math.max(2, ...v.cc.map(c => c.n)), lmax = Math.log(max);
+  map.querySelectorAll("path").forEach(el => {
+    const c = v.ccMap.get(el.dataset.cc);
+    el.setAttribute("fill", c ? mix("#e3ecfb", "#2457c5", Math.log(c.n) / lmax * 0.85 + 0.15) : "#eef0f3");
+    el.classList.toggle("has", !!c); el.classList.toggle("sel", el.dataset.cc === state.country);
+    el.firstChild.textContent = `${countryName(el.dataset.cc)}: ${c ? `${c.n} joint papers, ${c.who.size} CML people` : "no joint papers"}`;
+  });
+  $("partnersSum").textContent = `${v.papers.toLocaleString("en")} joint papers by ${list.length} people · ${v.inst.length.toLocaleString("en")} institutions in ${v.cc.length} countries`;
+  const q = state.instQ.trim().toLowerCase();
+  const rows = v.inst.filter(r => (!state.country || NET.inst[r.i][1] === state.country) && (!q || instName(r.i).toLowerCase().includes(q))).slice(0, 250);
+  $("instTitle").textContent = state.country ? `Partner institutions in ${countryName(state.country)}` : "Partner institutions";
+  $("clearCountry").hidden = !state.country;
+  $("instTable").tBodies[0].innerHTML = rows.map(r => `<tr class="click${String(r.i) === state.inst ? " sel" : ""}" data-inst="${r.i}"><td>${esc(instName(r.i))}</td><td>${esc(NET.inst[r.i][1])}</td><td class="num">${r.n}</td></tr>`).join("")
+    || `<tr><td colspan="3" class="mute">No partner institutions for this selection.</td></tr>`;
+  const ir = state.inst != null && v.inst.find(r => String(r.i) === state.inst), cr = state.country && v.ccMap.get(state.country);
+  if (ir) { $("sideTitle").textContent = `CML people working with ${instName(ir.i)}`; $("sideBox").innerHTML = whoList(ir.who); }
+  else if (cr) { $("sideTitle").textContent = `CML people with partners in ${countryName(state.country)}`; $("sideBox").innerHTML = whoList(cr.who); }
+  else {
+    $("sideTitle").textContent = "Countries by joint papers";
+    $("sideBox").innerHTML = `<table class="tbl"><thead><tr><th>Country</th><th class="num">Papers</th><th class="num">CML people</th></tr></thead><tbody>${
+      v.cc.slice(0, 80).map(c => `<tr class="click" data-country="${esc(c.cc)}"><td>${esc(countryName(c.cc))}</td><td class="num">${c.n}</td><td class="num">${c.who.size}</td></tr>`).join("")}</tbody></table>`;
+  }
+}
+
+/* ---------- find expertise view ---------- */
+const X_EXAMPLES = ["critical raw materials", "pollinators", "microplastics", "circular economy", "nitrogen", "life cycle assessment", "urban green", "eDNA"];
+const STOP = new Set(["the", "of", "and", "in", "on", "for", "a", "an", "to", "what", "who", "is", "are", "latest", "research", "state", "art", "about", "works"]);
+function renderExpertise(list) {
+  $("xExamples").innerHTML = "Try: " + X_EXAMPLES.map(x => `<button type="button" class="chip" data-xq="${esc(x)}">${esc(x)}</button>`).join("");
+  const q = state.xq.trim().toLowerCase(), box = $("xResults");
+  if (!q) { box.innerHTML = `<p class="pane-intro">Type a topic to see who at CML works on it, ranked by how often it appears in their profile keywords, paper keywords, paper titles and bio. The filters on the left narrow the list.</p>`; return; }
+  const terms = q.split(/[^a-z0-9\-]+/).filter(t => t.length > 2 && !STOP.has(t));
+  const fields = p => [[p.kws, 3], [p.pub.pkw, 3], [p.themes, 2], [p.pub.topics, 2], [p.pub.papers.map(w => w.t || ""), 2]];
+  const scored = list.map(p => {
+    let sc = 0; const hits = new Set();
+    fields(p).forEach(([arr, w]) => arr.forEach(txt => {
+      const t = txt.toLowerCase();
+      if (t.includes(q)) { sc += w * 3; hits.add(txt); return; }
+      const m = terms.filter(x => t.includes(x)).length;
+      if (terms.length && m === terms.length) { sc += w * 1.5; hits.add(txt); }
+      else if (m && terms.length > 1) sc += w * 0.4 * m / terms.length;
+    }));
+    if ((p.summary || "").toLowerCase().includes(q)) sc += 2;
+    return { p, sc: sc * (1 + Math.log10(1 + p.pub.n_cml) / 4), hits: [...hits] };
+  }).filter(d => d.sc > 1).sort((a, b) => b.sc - a.sc).slice(0, 30);
+  const rx = new RegExp([q, ...terms].map(x => esc(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "gi");
+  const mk = t => esc(t).replace(rx, m => `<mark>${m}</mark>`);
+  box.innerHTML = scored.length ? `<h3>${scored.length === 30 ? "Top 30" : scored.length} people</h3>` + scored.map(({ p, hits }) => `<div class="xres">
+      <img src="${esc(p.photo_url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div><button class="who" data-open="${esc(p.id)}"><b>${esc(p.name)}</b></button>
+        <span class="badge" style="background:${COLORS[p.field]}">${p.field === "industrial_ecology" ? "IE" : "EB"}</span>${p.cml_themes.map(c => `<span class="cmlbadge" style="color:${cmlColor(c)}" title="${esc(c)}">${icon(c, 14)}</span>`).join("")}
+        <div class="mute">${esc(p.rank)}${p.pub.n ? ` · ${papers(p.pub.n)}` : ""}</div>
+        <div class="why">${hits.slice(0, 4).map(mk).join(" · ") || "mentioned in bio"}</div></div></div>`).join("")
+    : `<p class="pane-intro">Nobody${list.length < people.length ? " in the current filters" : ""} matches “${esc(state.xq)}” in keywords, paper titles or bio. Try a broader word${list.length < people.length ? " or clear the filters" : ""}.</p>`;
+}
+
+/* ---------- Ask view: chat with the research assistant (served by serve.py) ---------- */
+const ask = { api: null, msgs: [], busy: false, person: null };
+const ASK_EXAMPLES = ["What is the state of the art at CML on critical raw materials?", "Who works on pollinators, and with which partners?",
+  "Which CML researchers work with Brazil?", "What has CML published on microplastics since 2022?"];
+async function checkApi() {
+  if (ask.api !== null) return ask.api;
+  if (location.protocol === "file:") return (ask.api = false);
+  try { const r = await fetch("api/health"); ask.api = r.ok ? await r.json() : false; } catch (e) { ask.api = false; }
+  return ask.api;
+}
+function mdToHtml(md, refs) {
+  const num = new Map(refs.map((r, i) => [r.id, i + 1]));
+  const names = people.map(p => p.name).sort((a, b) => b.length - a.length);
+  const inline = t => {
+    let h = esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*]+)\*/g, "$1<i>$2</i>");
+    h = h.replace(/\[(W\d+)\]/g, (m, id) => num.has(id) ? `<sup><a href="#ref-${id}" data-ref="${id}">${num.get(id)}</a></sup>` : "");
+    h = h.replace(/<\/sup>\s*<sup>/g, "</sup><sup>,</sup><sup>");
+    names.forEach(n => { const e = esc(n); if (h.includes(e)) h = h.split(e).join(`<button class="who" data-open="${esc(byName.get(n).id)}">${e}</button>`); });
+    return h;
+  };
+  const out = []; let list = null;
+  md.split(/\n/).forEach(line => {
+    const li = line.match(/^\s*(?:[-*•]|(\d+)\.)\s+(.*)/);
+    if (li) { const tag = li[1] ? "ol" : "ul"; if (list !== tag) { if (list) out.push(`</${list}>`); out.push(`<${tag}>`); list = tag; } out.push(`<li>${inline(li[2])}</li>`); return; }
+    if (list) { out.push(`</${list}>`); list = null; }
+    const hd = line.match(/^#{1,4}\s+(.*)/);
+    if (hd) out.push(`<h4>${inline(hd[1])}</h4>`); else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  });
+  if (list) out.push(`</${list}>`);
+  return out.join("");
+}
+const byName = new Map(people.map(p => [p.name, p]));
+function renderAsk() {
+  checkApi().then(api => {
+    $("askIntro").innerHTML = api
+      ? `<p class="pane-intro">Ask questions about CML research. The assistant searches the papers of current CML staff since 2010 (titles, abstracts, keywords from OpenAlex) and staff profiles, and cites the papers it uses. It sees abstracts, not full texts. Model: ${esc(api.model || "?")} (${({ anthropic: "Claude", mistral: "Mistral", local: "local" })[api.provider] || esc(api.provider)}, ${esc(api.mode)} mode)${api.problem ? ` · <b>${esc(api.problem)}</b>` : ""}.</p>
+         <div class="examples" style="margin-top:6px">Try: ${ASK_EXAMPLES.map(x => `<button type="button" class="chip" data-askq="${esc(x)}">${esc(x)}</button>`).join("")}</div>`
+      : `<p class="pane-intro"><b>The assistant needs a small local server.</b> In the CML_network folder run <code>python3 serve.py</code> and open <code>http://localhost:8765</code>. It needs <code>data/knowledge.db</code> (from <code>build_index.py</code>) and a language model: a local one in LM Studio or Ollama (default), or Claude with an <code>ANTHROPIC_API_KEY</code> in <code>.env</code>.</p>`;
+    $("askGo").disabled = !api || !api.ready || ask.busy; $("askQ").disabled = !api;
+  });
+  const sp = ask.person && byPid.get(ask.person);
+  $("askScope").innerHTML = sp ? `Answers about <span class="chip">${esc(sp.name)}</span><button class="link" id="askAll">ask about all of CML instead</button>` : "";
+  $("askScope").style.marginBottom = sp ? "8px" : "0";
+  $("askLog").innerHTML = ask.msgs.map((m, k) => m.role === "user" ? `<div class="msg user">${esc(m.content)}</div>`
+    : m.error ? `<div class="msg bot err">${esc(m.error)}</div>`
+    : `<div class="msg bot">${m.steps && m.steps.length ? `<div class="steps">Looked up: ${m.steps.map(s => esc(s.tool.replace("_", " ") + (s.input.query ? ` “${s.input.query}”` : s.input.name ? ` ${s.input.name}` : ""))).join(" · ")}</div>` : ""}
+       ${mdToHtml(m.content, m.refs || [])}
+       ${(m.refs || []).length ? `<div class="refs"><ol>${m.refs.map(r => `<li id="ref-${r.id}">${esc((r.authors || "").split(",")[0])}${(r.authors || "").includes(",") ? " et al." : ""} (${r.year}). ${r.doi ? `<a href="${esc(r.doi)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : esc(r.title)}${r.venue ? ". <i>" + esc(r.venue) + "</i>" : ""}</li>`).join("")}</ol></div>` : ""}</div>`).join("")
+    + (ask.busy ? `<div class="msg bot thinking">Searching CML papers…</div>` : "");
+}
+async function sendAsk(q) {
+  q = (q || "").trim(); if (!q || ask.busy) return;
+  ask.msgs.push({ role: "user", content: q }); ask.busy = true; $("askQ").value = ""; renderAsk();
+  try {
+    const r = await fetch("api/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ person_id: ask.person, messages: ask.msgs.filter(m => !m.error).map(m => ({ role: m.role, content: m.content })) }) });
+    const out = await r.json();
+    ask.msgs.push(r.ok ? { role: "assistant", content: out.answer, refs: out.references, steps: out.steps } : { role: "assistant", error: out.error || "The assistant did not answer." });
+  } catch (e) { ask.msgs.push({ role: "assistant", error: "Could not reach the assistant. Is serve.py still running?" }); }
+  ask.busy = false; renderAsk();
+  const log = $("askLog"); log.lastElementChild && log.lastElementChild.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function openPerson(id) {
+  const p = byPid.get(id); if (!p) return;
+  state.card = p;
+  if (state.tab !== "map") { state.tab = "map"; markSeg("tabs", "tab", "map"); render(); }
+  const n = graph.nodes.find(x => x.person === p);
+  if (n) setFocus(nodeFocus(n)); else renderCard();
+  $("graph-wrap").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* ---------- main render ---------- */
+// opts.keepFacets: skip rebuilding the facet lists. opts.styleOnly: graph structure unchanged, only focus/colour/labels changed.
+function render(opts = {}) {
+  const list = filtered();
+  document.body.dataset.view = state.view; document.body.dataset.group = cmlGrouped() ? "cml" : "free"; document.body.dataset.tab = state.tab;
+  $("partnersPane").hidden = state.tab !== "partners"; $("expertisePane").hidden = state.tab !== "expertise"; $("askPane").hidden = state.tab !== "ask";
+  renderPills(); renderActive(); saveHash();
+  $("stats").textContent = `${list.length} of ${people.length} people`;
+  const active = (state.depts.size < Object.keys(LABELS).length ? 1 : 0) + state.tags.size + state.kws.size + (state.terms.length ? 1 : 0) + state.cml.size;
+  $("filterFab").textContent = `Filters${active ? " (" + active + " active)" : ""} · ${list.length} people`;
+  $("sheetDone").textContent = `Show ${list.length} people`;
+  $("tagSel").textContent = state.tags.size ? `(${state.tags.size} selected)` : ""; if (state.tags.size) $("tagBox").open = true;
+  $("kwSel").textContent = state.kws.size ? `(${state.kws.size} selected)` : ""; if (state.kws.size) $("kwBox").open = true;
+  if (!opts.keepFacets && !opts.styleOnly) {
+    renderFacet("tagList", "tag", p => p.harmonized_tags, state.tags, state.tagQ);
+    renderFacet("kwList", "kw", p => p.kws, state.kws, state.kwQ);
+  }
+  if (state.tab === "partners") renderPartners(list);
+  else if (state.tab === "expertise") renderExpertise(list);
+  else if (state.tab === "ask") renderAsk();
+  else if (opts.styleOnly) { syncDom(); placeAll(); } else { renderGraph(list); }
+  if (state.tab === "map") renderClusters();
+  renderPeople(list);
+  renderCard();
+}
+
+/* ---------- events ---------- */
+function toggle(set, v, on) { on ? set.add(v) : set.delete(v); }
+function setFocus(f) {
+  const same = state.focus && f && state.focus.kind === f.kind && state.focus.title === f.title;
+  state.focus = same ? null : f;
+  render({ styleOnly: true });
+}
+function nodeFocus(n) {
+  if (!n.person) return { kind: "node", title: n.id, labels: [n.id] };
+  const near = graph.links.filter(l => l.s === n || l.t === n).map(l => (l.s === n ? l.t : l.s).id);
+  return { kind: "node", title: `${n.id} (+${near.length} related)`, labels: [n.id, ...near] };
+}
+
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.dept) { toggle(state.depts, t.dataset.dept, t.checked); state.focus = null; renderPos(); render(); }
+  else if (t.dataset.pos) { toggle(state.pos, t.dataset.pos, t.checked); state.focus = null; render(); }
+  else if (t.dataset.tag !== undefined) { toggle(state.tags, t.dataset.tag, t.checked); state.focus = null; render(); }
+  else if (t.dataset.kw !== undefined) { toggle(state.kws, t.dataset.kw, t.checked); state.focus = null; render(); }
+});
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (!t.closest(".opts")) document.querySelector(".opts").open = false;
+  const rm = t.closest("[data-rm]");
+  if (rm) {
+    const [kind, ...rest] = rm.dataset.rm.split(":"), val = rest.join(":");
+    if (kind === "dept") state.depts = new Set(Object.keys(LABELS)); else if (kind === "pos") { state.pos = new Set(POSITIONS); renderPos(); } else if (kind === "cml") state.cml.delete(val);
+    else if (kind === "tag") state.tags.delete(val); else if (kind === "kw") state.kws.delete(val);
+    else if (kind === "q") { state.q = ""; state.terms = []; $("q").value = ""; }
+    if (kind === "dept") renderDept();
+    state.focus = null; render(); return;
+  }
+  const pill = t.closest("[data-cml]");
+  if (pill) { toggle(state.cml, pill.dataset.cml, !state.cml.has(pill.dataset.cml)); state.focus = null; render(); return; }
+  const chip = t.closest(".chip[data-tag], .chip[data-kw]");   // other chips (examples, paper keywords) are not filters
+  if (chip) {
+    if (chip.dataset.tag !== undefined) toggle(state.tags, chip.dataset.tag, !state.tags.has(chip.dataset.tag));
+    else toggle(state.kws, chip.dataset.kw, !state.kws.has(chip.dataset.kw));
+    state.focus = null; render(); return;
+  }
+  const cl = t.closest(".cluster");
+  if (cl) {
+    const c = graph.clusters[+cl.dataset.c];
+    setFocus({ kind: "cluster", id: c.id, title: c.name, labels: clusterIds(c) }); return;
+  }
+  if (t.id === "clearFocus") { state.focus = null; render({ styleOnly: true }); return; }
+  if (t.dataset.clear) { (t.dataset.clear === "tag" ? state.tags : state.kws).clear(); state.focus = null; render(); return; }
+  if (t.closest("#tagMode") && t.dataset.m) { state.tagMode = t.dataset.m; markSeg("tagMode", "m", state.tagMode); render(); return; }
+  if (t.closest("#kwMode") && t.dataset.m) { state.kwMode = t.dataset.m; markSeg("kwMode", "m", state.kwMode); render(); return; }
+  const tab = t.closest("#tabs button");
+  if (tab) { state.tab = tab.dataset.tab; markSeg("tabs", "tab", state.tab); if (state.tab !== "map") state.card = null; render(); return; }
+  if (t.closest("#lines") && t.dataset.l) { state.lines = t.dataset.l; markSeg("lines", "l", state.lines); state.focus = null; render({ keepFacets: true }); return; }
+  const aq = t.closest("[data-askq]");
+  if (aq) { sendAsk(aq.dataset.askq); return; }
+  const ab = t.closest("[data-askabout]");
+  if (ab) { ask.person = ab.dataset.askabout; ask.msgs = []; state.tab = "ask"; state.card = null; markSeg("tabs", "tab", "ask"); render(); $("askQ").focus(); return; }
+  if (t.id === "askAll") { ask.person = null; ask.msgs = []; renderAsk(); return; }
+  if (t.closest("[data-ref]")) { e.preventDefault(); const el = document.getElementById("ref-" + t.closest("[data-ref]").dataset.ref); if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.style.background = "#fff3c4"; setTimeout(() => el.style.background = "", 1500); } return; }
+  const op = t.closest("[data-open]");
+  if (op) { openPerson(op.dataset.open); return; }
+  const ex = t.closest("[data-xq]");
+  if (ex) { state.xq = ex.dataset.xq; $("xq").value = state.xq; render({ keepFacets: true }); return; }
+  const ir = t.closest("[data-inst]");
+  if (ir) { state.inst = state.inst === ir.dataset.inst ? null : ir.dataset.inst; renderPartners(filtered()); return; }
+  const cr = t.closest("[data-country]");
+  if (cr) { state.country = cr.dataset.country; state.inst = null; renderPartners(filtered()); return; }
+  if (t.id === "clearCountry") { state.country = null; state.inst = null; renderPartners(filtered()); return; }
+  if (t.closest("#mapView") && t.dataset.mv) { state.mapView = t.dataset.mv; markSeg("mapView", "mv", state.mapView); renderPartners(filtered()); return; }
+  if (t.closest("#worldMap path.has")) { const c = t.closest("path").dataset.cc; state.country = state.country === c ? null : c; state.inst = null; renderPartners(filtered()); return; }
+  if (t.closest("#colorBy") && t.dataset.c) { state.colorBy = t.dataset.c; state.focus = null; markSeg("colorBy", "c", state.colorBy); render({ keepFacets: true }); return; }
+});
+function markSeg(id, attr, val) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset[attr] === val)); }
+$("tagSearch").addEventListener("input", e => { state.tagQ = e.target.value; renderFacet("tagList", "tag", p => p.harmonized_tags, state.tags, state.tagQ); });
+$("kwSearch").addEventListener("input", e => { state.kwQ = e.target.value; renderFacet("kwList", "kw", p => p.kws, state.kws, state.kwQ); });
+let qTimer = 0;
+$("q").addEventListener("input", e => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    state.q = e.target.value; state.terms = state.q.toLowerCase().split(/\s+/).filter(Boolean); state.focus = null; render();
+  }, 150);
+});
+$("resolution").addEventListener("input", e => { state.resolution = +e.target.value; $("resolutionVal").textContent = state.resolution; state.focus = null; render({ keepFacets: true }); });
+$("minCount").addEventListener("input", e => { state.minCount = +e.target.value; $("minCountVal").textContent = state.minCount; state.focus = null; render({ keepFacets: true }); });
+$("askGo").addEventListener("click", () => sendAsk($("askQ").value));
+$("askQ").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAsk($("askQ").value); } });
+$("instQ").addEventListener("input", e => { state.instQ = e.target.value; renderPartners(filtered()); });
+let xTimer = 0;
+$("xq").addEventListener("input", e => { clearTimeout(xTimer); xTimer = setTimeout(() => { state.xq = e.target.value; saveHash(); renderExpertise(filtered()); }, 120); });
+$("allLabels").addEventListener("change", e => { state.allLabels = e.target.checked; render({ styleOnly: true }); });
+$("reset").addEventListener("click", () => {
+  state.depts = new Set(Object.keys(LABELS)); state.pos = new Set(POSITIONS); state.tags.clear(); state.kws.clear(); state.cml.clear(); state.focus = null;
+  state.country = null; state.inst = null; renderPos();
+  state.tagQ = state.kwQ = state.q = ""; state.terms = []; $("tagSearch").value = $("kwSearch").value = $("q").value = ""; renderDept(); render();
+});
+
+function toggleSide(cls, btn) {
+  const hidden = document.body.classList.toggle(cls);
+  const b = $(btn), left = btn === "edgeFilters";
+  b.setAttribute("aria-pressed", String(!hidden));
+  b.textContent = left ? (hidden ? "›" : "‹") : (hidden ? "‹" : "›");   // arrow points the way the panel will move
+  b.setAttribute("aria-label", (hidden ? "Show " : "Hide ") + (left ? "filter panel" : "people list"));
+  requestAnimationFrame(() => render());   // the map refits to its new width
+}
+$("edgeFilters").addEventListener("click", () => toggleSide("hide-filters", "edgeFilters"));
+$("edgePeople").addEventListener("click", () => toggleSide("hide-people", "edgePeople"));
+function setSheet(on) { document.body.classList.toggle("show-filters", on); if (on) $("filters").scrollTop = 0; }
+$("filterFab").addEventListener("click", () => setSheet(true));
+$("sheetDone").addEventListener("click", () => setSheet(false));
+$("sheetReset").addEventListener("click", () => $("reset").click());
+let wasNarrow = window.matchMedia("(max-width:760px)").matches;
+let resizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    wasNarrow = window.matchMedia("(max-width:760px)").matches;
+    render({ keepFacets: true });
+  }, 200);
+});
+
+/* zoom / pan / drag */
+// cluster names on the map: hover previews the group, click pins the highlight (same as the cluster cards)
+const clusterIds = c => (c.members || c.nodes).map(n => n.id);
+function setHover(c) {
+  const set = c ? new Set(clusterIds(c)) : focusLabels();
+  els.nodes.forEach((e, id) => { e.g.classList.toggle("dim", !!set && !set.has(id)); });
+  graph.links.forEach(l => { if (l.el) l.el.classList.toggle("dim", !!set && !(set.has(l.s.id) && set.has(l.t.id))); });
+  graph.clusters.forEach(k => { if (k.halo) k.halo.lab.classList.toggle("hot", k === c); });
+}
+$("svg").addEventListener("pointerover", e => { const l = e.target.closest(".halo-label"); if (l) setHover(l.__c); });
+$("svg").addEventListener("pointerout", e => { if (e.target.closest(".halo-label")) setHover(null); });
+$("svg").addEventListener("click", e => {
+  const l = e.target.closest(".halo-label"); if (!l) return;
+  const c = l.__c; setFocus({ kind: "cluster", id: c.id, title: c.name, labels: clusterIds(c) });
+});
+$("svg").addEventListener("keydown", e => {
+  const l = e.target.closest && e.target.closest(".halo-label");
+  if (l && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); l.dispatchEvent(new MouseEvent("click", { bubbles: true })); }
+});
+function closeCard() {
+  if (!state.card) return;
+  state.card = null;
+  if (state.focus && state.focus.kind === "node") { state.focus = null; render({ styleOnly: true }); } else renderCard();
+}
+$("card").addEventListener("click", e => { if (e.target.closest("#cardClose")) closeCard(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeCard(); });
+// a press anywhere outside the card closes it, except on a person's dot (that opens that person's card instead)
+document.addEventListener("pointerdown", e => { if (state.card && !e.target.closest("#card, .node")) closeCard(); });
+$("zin").addEventListener("click", () => zoomAt(view.W / 2, view.H / 2, 1.3));
+$("zout").addEventListener("click", () => zoomAt(view.W / 2, view.H / 2, 1 / 1.3));
+$("zfit").addEventListener("click", fit);
+$("svg").addEventListener("wheel", e => {
+  if (window.matchMedia("(max-width:760px)").matches) return;
+  e.preventDefault(); const p = svgPoint(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+
+const tip = $("tip");
+let drag = null;
+$("svg").addEventListener("pointerdown", e => {
+  if (e.button !== 0 || e.target.closest(".halo-label")) return;   // halo labels are clickable, not pan handles
+  const g = e.target.closest(".node"), p = svgPoint(e);
+  drag = g ? { node: g.__n, moved: false, sx: e.clientX, sy: e.clientY }
+           : { pan: true, p0: p, x0: view.x, y0: view.y };
+  $("svg").setPointerCapture(e.pointerId); tip.style.display = "none";
+});
+$("svg").addEventListener("pointermove", e => {
+  if (drag) {
+    if (drag.node) {
+      if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+      drag.moved = true; drag.node.fixed = true;
+      const p = svgPoint(e); drag.node.x = (p.x - view.x) / view.k; drag.node.y = (p.y - view.y) / view.k;
+      reheat(0.3); placeAll();
+    } else {
+      const p = svgPoint(e); view.x = drag.x0 + p.x - drag.p0.x; view.y = drag.y0 + p.y - drag.p0.y;
+      $("svg").classList.add("panning"); applyView();
+    }
+    return;
+  }
+  const g = e.target.closest(".node");
+  if (!g) { tip.style.display = "none"; return; }
+  const n = g.__n, who = n.people.map(p => p.name);
+  if (n.person) {
+    const p = n.person;
+    tip.innerHTML = `<b>${esc(p.name)}</b><br>${esc(p.rank)} · ${LABELS[p.field]}<br>${p.cml_themes.map(c => `${icon(c, 12)} ${esc(c)}`).join("<br>")}`;
+    tip.style.display = "block"; tip.style.left = e.clientX + 14 + "px"; tip.style.top = e.clientY + 14 + "px"; return;
+  }
+  tip.innerHTML = `<b>${esc(n.id)}</b><br>${who.length} people: ${esc(who.slice(0, 8).join(", "))}${who.length > 8 ? "…" : ""}`;
+  tip.style.display = "block"; tip.style.left = e.clientX + 14 + "px"; tip.style.top = e.clientY + 14 + "px";
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag; drag = null; $("svg").classList.remove("panning");
+  if (d.node) { d.node.fixed = false; if (!d.moved) { setFocus(nodeFocus(d.node)); state.card = state.focus && state.focus.kind === "node" ? d.node.person : null; renderCard(); } else positions.set(d.node.id, { x: d.node.x, y: d.node.y }); }
+}
+$("svg").addEventListener("pointerup", endDrag);
+$("svg").addEventListener("pointercancel", endDrag);
+$("svg").addEventListener("mouseleave", () => tip.style.display = "none");
+
+$("share").addEventListener("click", () => {
+  const done = () => { $("shareTxt").textContent = "Copied!"; setTimeout(() => $("shareTxt").textContent = "Copy link", 1500); };
+  (navigator.clipboard ? navigator.clipboard.writeText(location.href) : Promise.reject()).then(done, () => { prompt("Copy this link", location.href); });
+});
+document.addEventListener("keydown", e => {
+  const t = e.target, typing = /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
+  if ((e.key === "Enter" || e.key === " ") && t.getAttribute && t.getAttribute("role") === "button") {
+    e.preventDefault();
+    if (t.__n) setFocus(nodeFocus(t.__n)); else t.click();
+  } else if (e.key === "/" && !typing) { e.preventDefault(); $("q").focus(); }
+  else if (e.key === "Escape") {
+    if (state.focus) { state.focus = null; render({ styleOnly: true }); }
+    else if (t === $("q") && $("q").value) { $("q").value = ""; $("q").dispatchEvent(new Event("input")); }
+  }
+});
+
+loadHash(); $("clusterBox").open = state.view !== "people"; renderDept(); renderPos(); render();
+</script>
+</body>
+</html>

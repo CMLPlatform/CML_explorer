@@ -1,0 +1,6 @@
+# scrape_staff.py and harvest_openalex.py
+requests>=2.31
+beautifulsoup4>=4.12
+# only with LLM_PROVIDER=anthropic (local models need nothing extra)
+anthropic>=0.40
+# harmonize.py, build_*.py, serve.py: standard library only
