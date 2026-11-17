@@ -4,7 +4,7 @@ An interactive map of the research staff of the Institute of Environmental Scien
 
 Open `dashboard.html` (or its copy `index.html`) in a browser. It is a single self-contained file (data embedded, no server, no external libraries).
 
-**Online**: GitHub Pages serves `index.html` from this repository ([CMLPlatform/CML_explorer](https://github.com/CMLPlatform/CML_explorer)). The online version has all views except **Ask**, because Ask needs the local server (`serve.py`).
+**Online**: GitHub Pages serves `index.html` from this repository ([CMLPlatform/CML_explorer](https://github.com/CMLPlatform/CML_explorer)). GitHub Pages only serves files, so it cannot run the assistant. On the online version, **Ask** calls the assistant on a Hugging Face Space that runs `serve.py` (see `deploy_space.py`). GitHub secrets are not used: the API key is a secret of the Space.
 
 ## What the dashboard shows
 
@@ -41,7 +41,8 @@ assistant.py, serve.py                              the assistant and a local se
 
 - **[build_index.py](build_index.py)**: SQLite database with people, papers (title, abstract, keywords, topics), authorships and partners, plus full-text (BM25) indexes.
 - **[assistant.py](assistant.py)**: answers questions from that database with numbered citations, and drops citations it cannot match to a real paper. Two modes: **retrieve** (the code runs the searches: experts, papers, people and countries named in the question; the model only writes the answer; reliable with small models) and **agent** (the model chooses its own searches with five tools; better for complex questions, needs a model that is good at tool calling). Try it from the terminal: `python3 assistant.py "Who works on pollinators?"`.
-- **[serve.py](serve.py)**: serves `dashboard.html` and the assistant at http://localhost:8765 (this computer only; `--host 0.0.0.0` shares it on the network, agree hosting with IT first).
+- **[serve.py](serve.py)**: serves `dashboard.html` and the assistant at http://localhost:8765 (this computer only; `--host 0.0.0.0` shares it on the network, agree hosting with IT first). Online, it also accepts calls from the pages in `ALLOWED_ORIGINS` and limits questions per visitor per hour (`HOURLY_LIMIT`) and per day in total (`DAILY_LIMIT`).
+- **[deploy_space.py](deploy_space.py)**: publishes the assistant as a Hugging Face Space (Docker, files in [space/](space/)). It uploads `serve.py`, `assistant.py`, `dashboard.html` and `data/knowledge.db`, and copies the model settings and API key from `.env` to the Space. `ASSISTANT_URL` in `build_dashboard.py` tells the online dashboard where the Space is. Run it again after `build_index.py` to update the Space.
 
 ### Choosing the language model
 

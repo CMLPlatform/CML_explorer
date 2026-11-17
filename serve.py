@@ -5,11 +5,19 @@
 Serves dashboard.html and answers its "Ask" view through /api/ask (assistant.py). Standard library only, apart
 from the anthropic package (only needed with LLM_PROVIDER=anthropic). Model settings: see assistant.py. Listens on this computer only (127.0.0.1) by default; to let
 colleagues on the network use it, run with --host 0.0.0.0, but only after agreeing on hosting with IT.
+
+Online use (Hugging Face Space, see deploy_space.py and space/Dockerfile) takes these settings from the environment:
+    ALLOWED_ORIGINS   web pages on other sites that may call the API, comma-separated (e.g. https://cmlplatform.github.io)
+    HOURLY_LIMIT      questions per visitor (IP address) per hour; 0 = no limit (default)
+    DAILY_LIMIT       questions per day for all visitors together; 0 = no limit (default)
 """
 import argparse
 import json
 import sys
+import os
 import threading
+import time
+from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -19,6 +27,35 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE / "dashboard.html"
 _client = None
 _lock = threading.Lock()
+ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()}
+HOURLY_LIMIT = int(os.environ.get("HOURLY_LIMIT") or 0)
+DAILY_LIMIT = int(os.environ.get("DAILY_LIMIT") or 0)
+MAX_BODY = 200_000        # bytes per request
+MAX_QUESTION = 2_000      # characters per question
+_recent = defaultdict(deque)   # IP address -> times of its questions in the last hour
+_day = {"date": "", "n": 0}
+
+
+def over_limit(ip):
+    """A message for the visitor when a limit is reached, otherwise "" (and the question is counted)."""
+    now = time.time()
+    with _lock:
+        today = time.strftime("%Y-%m-%d", time.gmtime(now))
+        if _day["date"] != today:
+            _day.update(date=today, n=0)
+        if DAILY_LIMIT and _day["n"] >= DAILY_LIMIT:
+            return "The assistant has answered its maximum number of questions for today. Try again tomorrow."
+        q = _recent[ip]
+        while q and now - q[0] > 3600:
+            q.popleft()
+        if HOURLY_LIMIT and len(q) >= HOURLY_LIMIT:
+            return f"You can ask {HOURLY_LIMIT} questions per hour. Try again later."
+        q.append(now)
+        _day["n"] += 1
+        if len(_recent) > 10_000:   # forget visitors with no questions in the last hour
+            for k in [k for k, v in _recent.items() if not v or now - v[-1] > 3600]:
+                del _recent[k]
+        return ""
 
 
 def client():
@@ -40,8 +77,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if "json" in ctype or "html" in ctype else ""))
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self._cors()
         self.end_headers()
         self.wfile.write(data)
+
+    def _cors(self):
+        """Let the pages in ALLOWED_ORIGINS (e.g. the dashboard on GitHub Pages) call the API from the browser."""
+        origin = (self.headers.get("Origin") or "").rstrip("/")
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+
+    def _ip(self):
+        """The visitor's IP address. Behind a proxy (Hugging Face) it is the first one in X-Forwarded-For."""
+        fwd = self.headers.get("X-Forwarded-For", "")
+        return fwd.split(",")[0].strip() if fwd else self.client_address[0]
+
+    def do_OPTIONS(self):
+        """The browser asks this before a cross-site POST with a JSON body."""
+        self.send_response(204)
+        self._cors()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self):
         path = self.path.split("?")[0].split("#")[0]
@@ -57,10 +117,18 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/api/ask":
             return self._send(404, {"error": "not found"})
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            size = int(self.headers.get("Content-Length", 0))
+            if size > MAX_BODY:
+                return self._send(413, {"error": "The conversation is too long. Reload the page to start a new one."})
+            body = json.loads(self.rfile.read(size) or b"{}")
             msgs = [m for m in body.get("messages", []) if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
             if not msgs or msgs[-1]["role"] != "user":
                 return self._send(400, {"error": "send a list of messages ending with the user's question"})
+            if len(msgs[-1]["content"]) > MAX_QUESTION:
+                return self._send(400, {"error": f"Ask a shorter question (at most {MAX_QUESTION} characters)."})
+            limit = over_limit(self._ip())
+            if limit:
+                return self._send(429, {"error": limit})
             out = assistant.ask(msgs[-12:], person_id=body.get("person_id"), db=assistant.connect(), client=client())
             self._send(200, out)
         except Exception as e:   # report the problem to the page instead of dropping the connection

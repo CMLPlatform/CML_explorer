@@ -12,6 +12,7 @@ Usage: python3 build_dashboard.py [--strict]    (--strict: stop when a profile k
 """
 import difflib
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -31,6 +32,9 @@ OUT = HERE / "dashboard.html"
 REPORT = HERE / "tag_report.md"
 SITE_COPY = HERE / "cml-network-site" / "index.html"  # published copy, kept in sync here
 PAGES_COPY = HERE / "index.html"  # GitHub Pages entry point of this repo
+# Online research assistant (Hugging Face Space, see deploy_space.py). The Ask view on GitHub Pages calls it.
+# Empty = no online assistant. The environment variable ASSISTANT_URL overrides it.
+ASSISTANT_URL = os.environ.get("ASSISTANT_URL", "https://cmlplatform-cml-assistant.hf.space")
 
 MAX_TAGS = harmonize.MAX_THEMES  # people at the cap may have lost tags
 FIELDS = ("industrial_ecology", "environmental_biology")
@@ -224,7 +228,7 @@ def main():
     world = WORLD.read_text(encoding="utf-8") if WORLD.exists() else "null"
     html = (TEMPLATE.read_text(encoding="utf-8").replace("__DATA__", payload).replace("__TAXONOMY__", tax)
             .replace("__NETWORK__", json.dumps(net, ensure_ascii=False).replace("</", "<\\/") if net else "null")
-            .replace("__WORLD__", world))
+            .replace("__WORLD__", world).replace("__ASSISTANT_URL__", ASSISTANT_URL))
     OUT.write_text(html, encoding="utf-8")
     PAGES_COPY.write_text(html, encoding="utf-8")
     if SITE_COPY.parent.exists():

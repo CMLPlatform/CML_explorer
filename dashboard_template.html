@@ -1448,14 +1448,24 @@ function renderExpertise(list) {
 }
 
 /* ---------- Ask view: chat with the research assistant (served by serve.py) ---------- */
-const ask = { api: null, msgs: [], busy: false, person: null };
+// Online assistant (Hugging Face Space running serve.py). The page uses it when it has no api/ of its own (GitHub Pages).
+const ASSISTANT_URL = "__ASSISTANT_URL__";
+const ask = { api: null, base: "", msgs: [], busy: false, person: null };
 const ASK_EXAMPLES = ["What is the state of the art at CML on critical raw materials?", "Who works on pollinators, and with which partners?",
   "Which CML researchers work with Brazil?", "What has CML published on microplastics since 2022?"];
 async function checkApi() {
   if (ask.api !== null) return ask.api;
-  if (location.protocol === "file:") return (ask.api = false);
-  try { const r = await fetch("api/health"); ask.api = r.ok ? await r.json() : false; } catch (e) { ask.api = false; }
-  return ask.api;
+  // First the server that sent this page (serve.py on localhost or on the Space), then the online assistant.
+  const bases = location.protocol === "file:" ? [] : [""];
+  if (ASSISTANT_URL && !ASSISTANT_URL.startsWith("__")) bases.push(ASSISTANT_URL.replace(/\/*$/, "/"));
+  for (const b of bases) {
+    try {
+      const r = await fetch(b + "api/health");
+      const j = r.ok ? await r.json() : null;
+      if (j && j.provider) { ask.base = b; return (ask.api = j); }
+    } catch (e) { /* not this one: try the next */ }
+  }
+  return (ask.api = false);
 }
 function mdToHtml(md, refs) {
   const num = new Map(refs.map((r, i) => [r.id, i + 1]));
@@ -1484,6 +1494,8 @@ function renderAsk() {
     $("askIntro").innerHTML = api
       ? `<p class="pane-intro">Ask questions about CML research. The assistant searches the papers of current CML staff since 2010 (titles, abstracts, keywords from OpenAlex) and staff profiles, and cites the papers it uses. It sees abstracts, not full texts. Model: ${esc(api.model || "?")} (${({ anthropic: "Claude", mistral: "Mistral", local: "local" })[api.provider] || esc(api.provider)}, ${esc(api.mode)} mode)${api.problem ? ` · <b>${esc(api.problem)}</b>` : ""}.</p>
          <div class="examples" style="margin-top:6px">Try: ${ASK_EXAMPLES.map(x => `<button type="button" class="chip" data-askq="${esc(x)}">${esc(x)}</button>`).join("")}</div>`
+      : ASSISTANT_URL && !ASSISTANT_URL.startsWith("__") && location.protocol !== "file:"
+      ? `<p class="pane-intro"><b>The online assistant does not answer.</b> After a quiet period it needs up to a minute to start. <button type="button" class="link" id="askRetry">Try again</button></p>`
       : `<p class="pane-intro"><b>The assistant needs a small local server.</b> In the CML_network folder run <code>python3 serve.py</code> and open <code>http://localhost:8765</code>. It needs <code>data/knowledge.db</code> (from <code>build_index.py</code>) and a language model: a local one in LM Studio or Ollama (default), or Claude with an <code>ANTHROPIC_API_KEY</code> in <code>.env</code>.</p>`;
     $("askGo").disabled = !api || !api.ready || ask.busy; $("askQ").disabled = !api;
   });
@@ -1501,11 +1513,11 @@ async function sendAsk(q) {
   q = (q || "").trim(); if (!q || ask.busy) return;
   ask.msgs.push({ role: "user", content: q }); ask.busy = true; $("askQ").value = ""; renderAsk();
   try {
-    const r = await fetch("api/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+    const r = await fetch(ask.base + "api/ask", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ person_id: ask.person, messages: ask.msgs.filter(m => !m.error).map(m => ({ role: m.role, content: m.content })) }) });
     const out = await r.json();
     ask.msgs.push(r.ok ? { role: "assistant", content: out.answer, refs: out.references, steps: out.steps } : { role: "assistant", error: out.error || "The assistant did not answer." });
-  } catch (e) { ask.msgs.push({ role: "assistant", error: "Could not reach the assistant. Is serve.py still running?" }); }
+  } catch (e) { ask.msgs.push({ role: "assistant", error: ask.base ? "Could not reach the online assistant. Try again in a minute." : "Could not reach the assistant. Is serve.py still running?" }); }
   ask.busy = false; renderAsk();
   const log = $("askLog"); log.lastElementChild && log.lastElementChild.scrollIntoView({ block: "start", behavior: "smooth" });
 }
@@ -1602,6 +1614,7 @@ document.addEventListener("click", e => {
   const ab = t.closest("[data-askabout]");
   if (ab) { ask.person = ab.dataset.askabout; ask.msgs = []; state.tab = "ask"; state.card = null; markSeg("tabs", "tab", "ask"); render(); $("askQ").focus(); return; }
   if (t.id === "askAll") { ask.person = null; ask.msgs = []; renderAsk(); return; }
+  if (t.id === "askRetry") { ask.api = null; renderAsk(); return; }
   if (t.closest("[data-ref]")) { e.preventDefault(); const el = document.getElementById("ref-" + t.closest("[data-ref]").dataset.ref); if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.style.background = "#fff3c4"; setTimeout(() => el.style.background = "", 1500); } return; }
   const op = t.closest("[data-open]");
   if (op) { openPerson(op.dataset.open); return; }

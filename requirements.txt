@@ -4,3 +4,6 @@ beautifulsoup4>=4.12
 # only with LLM_PROVIDER=anthropic (local models need nothing extra)
 anthropic>=0.40
 # harmonize.py, build_*.py, serve.py: standard library only
+
+# deploy_space.py (Hugging Face Space for the online assistant)
+huggingface_hub>=0.25
