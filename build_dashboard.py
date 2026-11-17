@@ -34,7 +34,7 @@ SITE_COPY = HERE / "cml-network-site" / "index.html"  # published copy, kept in 
 PAGES_COPY = HERE / "index.html"  # GitHub Pages entry point of this repo
 # Online research assistant (Hugging Face Space, see deploy_space.py). The Ask view on GitHub Pages calls it.
 # Empty = no online assistant. The environment variable ASSISTANT_URL overrides it.
-ASSISTANT_URL = os.environ.get("ASSISTANT_URL", "https://cmlplatform-cml-assistant.hf.space")
+ASSISTANT_URL = os.environ.get("ASSISTANT_URL", "https://fdonati-cml-assistant.hf.space")
 
 MAX_TAGS = harmonize.MAX_THEMES  # people at the cap may have lost tags
 FIELDS = ("industrial_ecology", "environmental_biology")
