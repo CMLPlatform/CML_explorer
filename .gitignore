@@ -10,3 +10,6 @@ data/pub_texts.json
 __pycache__/
 .DS_Store
 data/knowledge.db
+
+# separate repo (CMLPlatform/senior_staff_dashboard); build_dashboard.py writes index.html into it
+cml-network-site/
