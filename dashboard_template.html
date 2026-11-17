@@ -156,6 +156,10 @@
   #card svg.ico { position:static; inset:auto; width:12px; height:12px; }
   #card h3 { margin:0 0 2px; font-size:15px; }
   #card .sub { color:var(--mute); }
+  #card .cask { margin-top:8px; }
+  .person img[data-open] { cursor:pointer; }
+  .person .ext { margin-left:4px; color:var(--mute); text-decoration:none; font-size:11px; }
+  .person .ext:hover { color:var(--accent); }
   #card .cx { margin-left:auto; border:0; background:none; cursor:pointer; font-size:18px; line-height:1; color:var(--mute); }
   #card h4 { margin:10px 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mute); }
   #card .row { display:flex; flex-wrap:wrap; gap:4px; }
@@ -563,6 +567,21 @@ const FIELD_NAMES = [
   { name: "Wildlife & conservation", tags: ["Animal & movement ecology", "Conservation, invasion & resilience", "Biodiversity & community ecology", "Genetics & eDNA"], kws: ["conservation biology", "bird ecology", "movement ecology", "biodiversity", "edna", "large herbivore ecology"] },
   { name: "Soil, plants & microbes", tags: ["Soil, fungi & microbes", "Plant & vegetation ecology"], kws: ["soil ecology", "fungi", "microbiomes", "plant soil interactions", "aquatic ecology", "plankton"] },
   { name: "Water & aquatic systems", tags: ["Water & aquatic systems"], kws: ["water", "water quality", "global hydrology", "freshwater biodiversity"] },
+  // Narrower names for the smaller clusters that form at higher "cluster detail" levels
+  { name: "Urban metabolism & buildings", tags: ["Built environment & mobility", "Material & substance flow analysis"], kws: ["built environment", "buildings", "urban metabolism", "construction materials"] },
+  { name: "Circular economy & critical materials", tags: ["Circular economy & critical materials", "Material & substance flow analysis"], kws: ["critical raw materials", "circular economy", "substance flow analysis", "recycling"] },
+  { name: "Footprints & trade", tags: ["Input-output analysis & footprints"], kws: ["input-output analysis", "environmental footprints", "trade", "consumption-based emissions"] },
+  { name: "Biodiversity & genetics", tags: ["Genetics & eDNA", "Biodiversity & community ecology"], kws: ["edna", "biodiversity", "genetics", "population genetics"] },
+  { name: "Landscapes & remote sensing", tags: ["Spatial analysis & GIS", "Land use & landscapes"], kws: ["gis", "remote sensing", "land use change", "landscape ecology"] },
+  { name: "Sustainability indicators & decisions", tags: ["Decision support & uncertainty", "Sustainability assessment & indicators"], kws: ["decision support", "uncertainty", "indicators", "multi-criteria decision analysis"] },
+  { name: "Chemical risk & safety", tags: ["Ecotoxicology & chemical pollution"], kws: ["environmental risk assessment", "risk assessment", "chemicals", "plastic pollution", "nanomaterials"] },
+  { name: "Environmental modelling", tags: ["Modelling, scenarios & integrated assessment"], kws: ["environmental modelling", "scenarios", "integrated assessment models"] },
+  { name: "Data science & global change", tags: ["Data science, computing & AI", "Earth system & global change"], kws: ["data science", "machine learning", "high performance computing"] },
+  { name: "Life cycle data & AI", tags: ["Data science, computing & AI", "Life cycle assessment"], kws: ["life cycle inventory", "machine learning", "python"] },
+  { name: "Ecosystem services & nature-based solutions", tags: ["Ecosystem services & nature-based solutions"], kws: ["nature-based solutions", "ecosystem services", "natural capital"] },
+  { name: "Plants & vegetation", tags: ["Plant & vegetation ecology", "Conservation, invasion & resilience"], kws: ["vegetation", "plant ecology", "invasive species", "plant traits"] },
+  { name: "Soil fungi & microbes", tags: ["Soil, fungi & microbes"], kws: ["fungi", "soil ecology", "microbiomes", "mycorrhiza"] },
+  { name: "Nutrients & biogeochemistry", tags: ["Nutrients & biogeochemical cycles", "Earth system & global change"], kws: ["nitrogen", "phosphorus", "biogeochemical modelling"] },
 ];
 // Methods: evidence in the person's original keywords (kw), in the start of the bio (text), or in a harmonized tag.
 const METHODS = [
@@ -647,7 +666,24 @@ function assignNames(clusters, items, score) {
     let sc = 0; c.people.forEach(p => { sc += score(p, it); });
     if (sc > 0) pairs.push([sc / Math.sqrt(c.people.length), c, it]);
   }));
-  pairs.sort((a, b) => b[0] - a[0]).forEach(([, c, it]) => { if (done.has(c) || taken.has(it.name)) return; done.add(c); taken.add(it.name); c.name = c.short = it.name; });
+  pairs.sort((a, b) => b[0] - a[0]).forEach(([, c, it]) => { if (done.has(c) || taken.has(it.name)) return; done.add(c); taken.add(it.name); c.name = c.short = it.name; c.named = true; });
+}
+// Clusters that no curated name fits: take the most distinctive shared topic that is not already a cluster name.
+// Clusters with no shared topic at all hold people whose profile lists no tags or keywords; they are grouped by
+// CML theme only, so they are named after that theme.
+function nameLeftovers(clusters) {
+  const used = new Set(clusters.filter(c => c.named).map(c => c.name));
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  clusters.filter(c => !c.named).forEach(c => {
+    let name = (c.cands || []).map(cap).find(s => !used.has(s));
+    if (!name) {
+      const cnt = new Map(); c.people.forEach(p => { const t = p.cml_themes[0]; if (t) cnt.set(t, (cnt.get(t) || 0) + 1); });
+      const theme = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t)[0];
+      name = theme ? `${theme}: no profile keywords` : "No profile keywords";
+    }
+    for (let i = 2; used.has(name); i++) name = name.replace(/ \(\d+\)$/, "") + ` (${i})`;   // last resort: keep names unique
+    used.add(name); c.name = c.short = name;
+  });
 }
 const fieldScore = (p, f) => f.tags.filter(t => p.tagSet.has(t)).length + 0.5 * f.kws.filter(k => p.kwSet.has(k)).length;
 const methodScore = (p, m) => methodFeatures(p).get(m.name) || 0;
@@ -747,10 +783,10 @@ function buildClusterGraph(nodes, mode) {
     c.ie = c.people.filter(p => p.field === "industrial_ecology").length; c.eb = c.people.length - c.ie;
     const cnt = new Map(); c.members.forEach(n => feats.get(n.id).forEach((_, k) => { if (!k.startsWith("cml:")) cnt.set(k, (cnt.get(k) || 0) + 1); }));
     const sc = ([k, n]) => (n >= 2 ? n / c.members.length * idf(k) * (k.startsWith("tag:") || k.startsWith("m:") ? 1.25 : 1) : 0);
-    const top = [...cnt.entries()].sort((x, y) => sc(y) - sc(x)).slice(0, 2).map(([k]) => k.replace(/^(tag|kw|m):/, ""));
-    c.name = top.join(" · ") || "Cluster"; c.short = top[0] || "Cluster";
+    c.cands = [...cnt.entries()].filter(e => sc(e) > 0).sort((x, y) => sc(y) - sc(x)).slice(0, 6).map(([k]) => k.replace(/^(tag|kw|m):/, ""));
   });
   if (mode === "method") assignNames(clusters, METHODS, methodScore); else assignNames(clusters, FIELD_NAMES, fieldScore);
+  nameLeftovers(clusters);
   if (mode !== "method") Object.entries(FIELD_EXTRA).forEach(([person, extra]) => {   // manual extra field memberships
     const n = nodes.find(x => x.person.name === person); if (!n) return;
     extra.forEach(name => {
@@ -1025,7 +1061,7 @@ function fit() {
     // people map: reserve screen margin for the halo labels, which sit outside the coloured areas
     const padX = state.view === "people" ? 150 : pad, padY = state.view === "people" ? 40 : pad;
     k = Math.min((W - 2 * padX) / Math.max(x1 - x0, 1), (H - 2 * padY) / Math.max(y1 - y0, 1), 2.5);
-    view.k = k; view.x = W / 2 - (x0 + x1) / 2 * k; view.y = H / 2 - (y0 + y1) / 2 * k;
+    view.k = view.fitK = k; view.x = W / 2 - (x0 + x1) / 2 * k; view.y = H / 2 - (y0 + y1) / 2 * k;
   }
   applyView();
   if (state.view === "people") placeAll();   // halo labels are placed relative to the visible area
@@ -1267,13 +1303,13 @@ function renderCard() {
     <div><h3><a href="${esc(p.profile_url)}" target="_blank" rel="noopener">${esc(p.name)}</a></h3>
     <div class="sub">${esc(p.rank || p.title || "")}</div><div class="sub">${esc(LABELS[p.field] || "")}${p.field_basis && p.field_basis !== "profile" ? ` <span title="Not on the university profile; from ${esc(p.field_basis)}">(inferred)</span>` : ""}</div></div>
     <button class="cx" id="cardClose" aria-label="Close">×</button></div>
+    <div class="cask"><button class="btn" data-askabout="${esc(p.id)}">Ask about ${esc(p.name.split(" ")[0])}'s work</button></div>
     <h4>CML themes</h4><div class="row">${themes}</div>${groups}
     ${p.themes.length ? `<h4>Tags</h4><div class="row">${p.themes.map(t => chip(t)).join("")}</div>` : ""}
     ${p.kws.length ? `<h4>Keywords</h4><div class="row">${p.kws.map(k => chip(k)).join("")}</div>` : ""}
     ${bio ? `<h4>About</h4><p class="bio">${esc(bio.length > 650 ? bio.slice(0, 650).replace(/\s+\S*$/, "") + "…" : bio)}</p>` : ""}
     ${projects.length ? `<h4>Projects</h4><div class="bio">${projects.map(pr => `<div><a href="${esc(pr.url)}" target="_blank" rel="noopener">${esc(pr.title)}</a></div>`).join("")}</div>` : ""}
-    ${pubCard(p)}
-    <div style="margin-top:10px"><button class="btn" data-askabout="${esc(p.id)}">Ask about ${esc(p.name.split(" ")[0])}'s work</button></div>`;
+    ${pubCard(p)}`;
   el.hidden = false;
 }
 const papers = n => `${n} paper${n === 1 ? "" : "s"}`;
@@ -1303,8 +1339,8 @@ function renderPeople(list) {
   $("people").innerHTML = shown.map(p => {
     const themes = p.themes.map(t => `<span role="button" tabindex="0" class="chip theme ${state.tags.has(t) ? "active" : ""} ${fl && fl.has(t) ? "hit" : ""}" data-tag="${esc(t)}" title="Filter by this tag">${esc(t)}</span>`).join("");
     const kws = p.kws.map(k => `<span role="button" tabindex="0" class="chip ${state.kws.has(k) ? "active" : ""} ${fl && fl.has(k) ? "hit" : ""}" data-kw="${esc(k)}" title="Filter by this keyword">${esc(k)}</span>`).join("");
-    return `<div class="person ${fl && itemsOf(p).some(i => fl.has(i)) ? "hl" : ""}"><img src="${esc(p.photo_url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-      <div><div class="name"><a href="${esc(p.profile_url)}" target="_blank" rel="noopener">${esc(p.name)}</a>
+    return `<div class="person ${fl && itemsOf(p).some(i => fl.has(i)) ? "hl" : ""}"><img src="${esc(p.photo_url)}" alt="" loading="lazy" data-open="${esc(p.id)}" title="Show ${esc(p.name)} on the map" onerror="this.style.visibility='hidden'">
+      <div><div class="name"><button class="who" data-open="${esc(p.id)}" title="Show on the map">${esc(p.name)}</button><a class="ext" href="${esc(p.profile_url)}" target="_blank" rel="noopener" title="University profile (opens in a new tab)" aria-label="University profile of ${esc(p.name)}">↗</a>
         <span class="badge" style="background:${COLORS[p.field]}">${p.field === "industrial_ecology" ? "IE" : "EB"}</span>${p.cml_themes.map(c => `<span class="cmlbadge" style="color:${cmlColor(c)}" title="${esc(c)}">${icon(c, 15)}</span>`).join("")}</div>
       <div class="mute">${esc(p.rank)}${p.title && !p.title.toLowerCase().startsWith((p.rank || "").toLowerCase()) ? " · " + esc(p.title) : ""}${p.pub.n ? ` · ${papers(p.pub.n)}` : ""}</div>
       ${snippet(p)}<div>${themes}</div>${kws || p.summary ? `<details class="bio" ${fl && p.kws.some(k => fl.has(k)) ? "open" : ""}><summary>Keywords &amp; bio</summary>${kws ? `<div>${kws}</div>` : ""}${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</details>` : ""}</div></div>`;
@@ -1527,8 +1563,24 @@ function openPerson(id) {
   state.card = p;
   if (state.tab !== "map") { state.tab = "map"; markSeg("tabs", "tab", "map"); render(); }
   const n = graph.nodes.find(x => x.person === p);
-  if (n) setFocus(nodeFocus(n)); else renderCard();
+  if (n) { state.focus = nodeFocus(n); render({ styleOnly: true }); centerOn(n); }   // always focus (setFocus would toggle it off on a 2nd click)
+  else renderCard();
   $("graph-wrap").scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+// Pan and zoom the map so the node sits in the free area next to the card (the card covers the left side).
+function centerOn(n) {
+  const card = $("card"), wrap = $("graph-wrap").getBoundingClientRect();
+  const cardFrac = !card.hidden && wrap.width ? Math.min(card.offsetWidth + 10, wrap.width * 0.6) / wrap.width : 0;
+  const k = Math.min(Math.max(view.k, (view.fitK || view.k) * 1.8), 3.5);
+  const tx = view.W * (cardFrac + (1 - cardFrac) / 2), ty = view.H / 2;
+  const from = { k: view.k, x: view.x, y: view.y }, to = { k, x: tx - n.x * k, y: ty - n.y * k }, t0 = performance.now();
+  const step = now => {
+    const a = Math.min((now - t0) / 450, 1), e = a < 0.5 ? 2 * a * a : 1 - (-2 * a + 2) ** 2 / 2;
+    view.k = from.k + (to.k - from.k) * e; view.x = from.x + (to.x - from.x) * e; view.y = from.y + (to.y - from.y) * e;
+    applyView();
+    if (a < 1) requestAnimationFrame(step); else if (state.view === "people") placeAll();
+  };
+  requestAnimationFrame(step);
 }
 
 /* ---------- main render ---------- */
