@@ -30,6 +30,7 @@ TEMPLATE = HERE / "dashboard_template.html"
 OUT = HERE / "dashboard.html"
 REPORT = HERE / "tag_report.md"
 SITE_COPY = HERE / "cml-network-site" / "index.html"  # published copy, kept in sync here
+PAGES_COPY = HERE / "index.html"  # GitHub Pages entry point of this repo
 
 MAX_TAGS = harmonize.MAX_THEMES  # people at the cap may have lost tags
 FIELDS = ("industrial_ecology", "environmental_biology")
@@ -225,6 +226,7 @@ def main():
             .replace("__NETWORK__", json.dumps(net, ensure_ascii=False).replace("</", "<\\/") if net else "null")
             .replace("__WORLD__", world))
     OUT.write_text(html, encoding="utf-8")
+    PAGES_COPY.write_text(html, encoding="utf-8")
     if SITE_COPY.parent.exists():
         SITE_COPY.write_text(html, encoding="utf-8")
     with_pubs = sum(1 for p in people if (p.get("pub") or {}).get("n"))
