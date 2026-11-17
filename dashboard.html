@@ -64,7 +64,6 @@
   .zoomctl button:hover { background:#eef3ff; }
   #emptyMsg { position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--mute); pointer-events:none; }
   mark { background:#fff3c4; padding:0 1px; border-radius:2px; }
-  .snippet { font-size:12px; color:var(--mute); margin-top:3px; }
   .splitbar { display:flex; height:5px; border-radius:3px; overflow:hidden; margin-top:5px; background:#e8ebef; }
   .splitbar i { display:block; height:100%; }
   #clusterBox { margin-top:10px; padding:8px 10px; }
@@ -275,7 +274,7 @@
   <aside class="filters" id="filters">
     <div class="sheet-head"><b>Filters</b><button class="btn" id="sheetReset">Reset</button><button class="btn primary" id="sheetDone">Show results</button></div>
     <h2>Search people</h2>
-    <input type="search" id="q" placeholder="Name, topic, anything in the bio…  ( / )" autocomplete="off">
+    <input type="search" id="q" placeholder="Name of a researcher…  ( / )" autocomplete="off">
     <h2>CML research theme</h2>
     <div id="cmlPills"></div>
     <h2>Department</h2>
@@ -412,6 +411,9 @@ const CML_ORDER = ["Biodiversity", "Water", "Future food", "Resources", "Urban"]
 const RING = CML_ORDER;   // theme anchors on the people map
 const cmlColor = c => TAX.cml[c] || "#bbb";
 
+// Lower case without accents, so "perez" finds "Pérez".
+function fold(s) { return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+const searchTerms = q => fold(q).split(/\s+/).filter(Boolean);
 const people = Object.values(DATA).flat().map(p => ({
   ...p,
   themes: p.harmonized_tags,
@@ -420,8 +422,7 @@ const people = Object.values(DATA).flat().map(p => ({
   kwSet: new Set(p.original_keywords || []),
   cmlSet: new Set(p.cml_themes),
   pub: p.pub || { n: 0, n_cml: 0, cites: 0, pkw: [], topics: [], sub: [], partners: [], countries: [], ext_coauthors: [], papers: [] },
-  hay: [p.name, p.title, p.rank, p.summary, ...p.harmonized_tags, ...(p.original_keywords || []),
-        ...((p.pub || {}).pkw || []), ...((p.pub || {}).topics || [])].join(" \n ").toLowerCase(),
+  nameKey: fold(p.name),   // the people search matches names only
 }));
 const byPid = new Map(people.map(p => [p.id, p]));
 const POSITIONS = ["Professors", "Associate & assistant professors", "Postdocs & researchers", "PhD candidates"];
@@ -453,7 +454,7 @@ function passes(p, skip) {
   if (skip !== "tag" && !matches(state.tags, p.tagSet, state.tagMode)) return false;
   if (skip !== "kw" && !matches(state.kws, p.kwSet, state.kwMode)) return false;
   if (skip !== "cml" && state.cml.size && !p.cml_themes.some(c => state.cml.has(c))) return false;
-  if (state.terms.length && !state.terms.every(t => p.hay.includes(t))) return false;
+  if (skip !== "q" && state.terms.length && !state.terms.every(t => p.nameKey.includes(t))) return false;
   return true;
 }
 const filtered = () => people.filter(p => passes(p));
@@ -1091,7 +1092,11 @@ function haloGeom(c) {   // smooth closed outline around the members, padded so 
   return { poly: hull, d: d + "Z", cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, rx: (x1 - x0) / 2, ry: (y1 - y0) / 2, top: y0 };
 }
 const labelShown = (n, fl) => state.allLabels || n.count >= 2 || (n.person && graph.nodes.length <= 70) || (fl && fl.has(n.id)) || graph.nodes.length <= 40;
-function focusLabels() { return state.focus ? new Set(state.focus.labels) : null; }
+// A clicked node or cluster sets the focus. Without one, a search highlights its matches; the other people stay on the map, dimmed.
+function focusLabels() {
+  if (state.focus) return new Set(state.focus.labels);
+  return state.terms.length ? new Set(filtered().flatMap(itemsOf)) : null;
+}
 const areaOf = id => { const th = state.view === "tags" ? [id] : (TAX.keywordThemes[id] || []); return th.length ? TAX.themeArea[th[0]] : null; };
 const areaColor = n => TAX.areas[areaOf(n.id)] || "#bbb";
 const deptColor = n => n.ie >= n.eb ? COLORS.industrial_ecology : COLORS.environmental_biology;   // people belong to one department; items take the one with most people (ties: IE)
@@ -1282,15 +1287,6 @@ function renderClusters() {
 }
 
 /* ---------- people ---------- */
-function snippet(p) {
-  if (!state.terms.length || !p.summary) return "";
-  const low = p.summary.toLowerCase(), hit = state.terms.map(t => low.indexOf(t)).filter(i => i >= 0).sort((a, b) => a - b)[0];
-  if (hit === undefined) return "";
-  const from = Math.max(0, hit - 60), to = Math.min(p.summary.length, hit + 100);
-  let txt = esc(p.summary.slice(from, to));
-  state.terms.forEach(t => { txt = txt.replace(new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), m => `<mark>${m}</mark>`); });
-  return `<div class="snippet">${from ? "…" : ""}${txt}${to < p.summary.length ? "…" : ""}</div>`;
-}
 function renderCard() {
   const el = $("card"), p = state.card;
   if (!p || state.tab !== "map") { el.hidden = true; el.innerHTML = ""; return; }
@@ -1343,7 +1339,7 @@ function renderPeople(list) {
       <div><div class="name"><button class="who" data-open="${esc(p.id)}" title="Show on the map">${esc(p.name)}</button><a class="ext" href="${esc(p.profile_url)}" target="_blank" rel="noopener" title="University profile (opens in a new tab)" aria-label="University profile of ${esc(p.name)}">↗</a>
         <span class="badge" style="background:${COLORS[p.field]}">${p.field === "industrial_ecology" ? "IE" : "EB"}</span>${p.cml_themes.map(c => `<span class="cmlbadge" style="color:${cmlColor(c)}" title="${esc(c)}">${icon(c, 15)}</span>`).join("")}</div>
       <div class="mute">${esc(p.rank)}${p.title && !p.title.toLowerCase().startsWith((p.rank || "").toLowerCase()) ? " · " + esc(p.title) : ""}${p.pub.n ? ` · ${papers(p.pub.n)}` : ""}</div>
-      ${snippet(p)}<div>${themes}</div>${kws || p.summary ? `<details class="bio" ${fl && p.kws.some(k => fl.has(k)) ? "open" : ""}><summary>Keywords &amp; bio</summary>${kws ? `<div>${kws}</div>` : ""}${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</details>` : ""}</div></div>`;
+      <div>${themes}</div>${kws || p.summary ? `<details class="bio" ${fl && p.kws.some(k => fl.has(k)) ? "open" : ""}><summary>Keywords &amp; bio</summary>${kws ? `<div>${kws}</div>` : ""}${p.summary ? `<p>${esc(p.summary)}</p>` : ""}</details>` : ""}</div></div>`;
   }).join("") || '<p class="mute">Nobody matches the current filters.</p>';
 }
 
@@ -1379,7 +1375,7 @@ function saveHash() {
 function loadHash() {
   const u = new URLSearchParams(location.hash.slice(1)), list = k => (u.get(k) || "").split("|").filter(Boolean);
   
-  if (u.get("q")) { state.q = u.get("q"); state.terms = state.q.toLowerCase().split(/\s+/).filter(Boolean); $("q").value = state.q; }
+  if (u.get("q")) { state.q = u.get("q"); state.terms = searchTerms(state.q); $("q").value = state.q; }
   list("cml").forEach(c => state.cml.add(c)); list("tag").forEach(c => state.tags.add(c)); list("kw").forEach(c => state.kws.add(c));
   if (u.get("dept")) state.depts = new Set(list("dept").filter(d => LABELS[d]));
   if (["cml", "field", "method"].includes(u.get("c"))) state.colorBy = u.get("c"); else if (u.get("c") === "cluster") state.colorBy = "field";
@@ -1586,7 +1582,7 @@ function centerOn(n) {
 /* ---------- main render ---------- */
 // opts.keepFacets: skip rebuilding the facet lists. opts.styleOnly: graph structure unchanged, only focus/colour/labels changed.
 function render(opts = {}) {
-  const list = filtered();
+  const list = filtered(), mapList = people.filter(p => passes(p, "q"));   // the search does not remove people from the map
   document.body.dataset.view = state.view; document.body.dataset.group = cmlGrouped() ? "cml" : "free"; document.body.dataset.tab = state.tab;
   $("partnersPane").hidden = state.tab !== "partners"; $("expertisePane").hidden = state.tab !== "expertise"; $("askPane").hidden = state.tab !== "ask";
   renderPills(); renderActive(); saveHash();
@@ -1603,9 +1599,9 @@ function render(opts = {}) {
   if (state.tab === "partners") renderPartners(list);
   else if (state.tab === "expertise") renderExpertise(list);
   else if (state.tab === "ask") renderAsk();
-  else if (opts.styleOnly) { syncDom(); placeAll(); } else { renderGraph(list); }
+  else if (opts.styleOnly) { syncDom(); placeAll(); } else { renderGraph(mapList); }
   if (state.tab === "map") renderClusters();
-  renderPeople(list);
+  renderPeople(state.focus ? mapList : list);
   renderCard();
 }
 
@@ -1688,7 +1684,7 @@ let qTimer = 0;
 $("q").addEventListener("input", e => {
   clearTimeout(qTimer);
   qTimer = setTimeout(() => {
-    state.q = e.target.value; state.terms = state.q.toLowerCase().split(/\s+/).filter(Boolean); state.focus = null; render();
+    state.q = e.target.value; state.terms = searchTerms(state.q); state.focus = null; render({ styleOnly: true });
   }, 150);
 });
 $("resolution").addEventListener("input", e => { state.resolution = +e.target.value; $("resolutionVal").textContent = state.resolution; state.focus = null; render({ keepFacets: true }); });
