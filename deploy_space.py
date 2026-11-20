@@ -11,8 +11,8 @@ Usage
 What it does
     1. Makes the Space (Docker, public) if it does not exist.
     2. Uploads space/README.md, space/Dockerfile, serve.py, assistant.py, dashboard.html, data/knowledge.db.
-    3. Copies the model settings from .env to the Space: LLM_PROVIDER, LLM_MODEL, LLM_MODE, LLM_BASE_URL as
-       variables, and the API keys (MISTRAL_API_KEY, ANTHROPIC_API_KEY, LLM_API_KEY) as secrets.
+    3. Copies the model settings from .env to the Space: LLM_PROVIDER, LLM_MODEL, LLM_FALLBACK_MODEL, LLM_MODE, LLM_BASE_URL as
+       variables, and the API keys (MISTRAL_API_KEY, HF_TOKEN, ANTHROPIC_API_KEY, LLM_API_KEY) as secrets.
        --no-secrets skips this step (then set them by hand in the Space settings).
 
 The Space must be public, because visitors' browsers call it. Everyone can then download the uploaded files,
@@ -36,8 +36,8 @@ FILES = {   # path in the Space -> local file
     "dashboard.html": HERE / "dashboard.html",
     "data/knowledge.db": HERE / "data" / "knowledge.db",
 }
-VARIABLES = ("LLM_PROVIDER", "LLM_MODEL", "LLM_MODE", "LLM_BASE_URL")
-SECRETS = ("MISTRAL_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_KEY")
+VARIABLES = ("LLM_PROVIDER", "LLM_MODEL", "LLM_FALLBACK_MODEL", "LLM_MODE", "LLM_BASE_URL")
+SECRETS = ("MISTRAL_API_KEY", "HF_TOKEN", "ANTHROPIC_API_KEY", "LLM_API_KEY")
 
 
 def space_url(repo_id):
@@ -51,6 +51,9 @@ def main():
     ap.add_argument("--no-secrets", action="store_true", help="do not copy model settings and API keys from .env")
     a = ap.parse_args()
 
+    # HF_TOKEN in .env is the Space's token for model calls (no write access). Remove it from the environment,
+    # so that huggingface_hub uploads with the token from "hf auth login"; it goes to the Space as a secret below.
+    model_token = os.environ.pop("HF_TOKEN", "")
     try:
         from huggingface_hub import CommitOperationAdd, HfApi
     except ImportError:
@@ -62,7 +65,7 @@ def main():
     st = assistant.status()
     if not a.no_secrets and st["provider"] == "local":
         sys.exit("LLM_PROVIDER is 'local' in .env. The Space cannot reach a model on this computer: "
-                 "set LLM_PROVIDER=mistral (or anthropic) and its API key in .env.")
+                 "set LLM_PROVIDER=hf, mistral or anthropic and its API key in .env.")
 
     api = HfApi()
     try:
@@ -77,7 +80,7 @@ def main():
     print(f"Uploaded {len(ops)} files.")
 
     if not a.no_secrets:
-        env = os.environ
+        env = {**os.environ, "HF_TOKEN": model_token}
         for key in VARIABLES:
             value = env.get(key, "")
             if value and not (key == "LLM_BASE_URL" and "localhost" in value):

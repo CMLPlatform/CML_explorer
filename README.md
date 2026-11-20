@@ -57,6 +57,8 @@ Settings go in `.env` (next to the scripts or one folder up).
 
 **Mistral API**: `LLM_PROVIDER=mistral`, `MISTRAL_API_KEY=...`, optionally `LLM_MODEL=mistral-medium-latest` (default; `mistral-small-latest` is cheaper, `mistral-large-latest` stronger). Default mode: agent.
 
+**Hugging Face Inference Providers**: `LLM_PROVIDER=hf`, `HF_TOKEN=...` (a fine-grained token with the permission "Make calls to Inference Providers"), optionally `LLM_MODEL=openai/gpt-oss-120b:nebius` (default) and `LLM_FALLBACK_MODEL=openai/gpt-oss-120b:ovhcloud`. The suffix after `:` chooses the provider. Nebius (EU company) is fast. OVHcloud (servers in France) is slower; the assistant uses the fallback model only when the first model fails. Costs come from the Hugging Face account's monthly credit. Default mode: agent.
+
 `LLM_MODE=retrieve` or `LLM_MODE=agent` overrides the default. For local models, set the context length to at least 8192 tokens in LM Studio or Ollama; one question sends about 2,000-3,000 tokens of search results. Any OpenAI-compatible service works with `LLM_BASE_URL` and `LLM_API_KEY`, for example a model hosted by the university.
 
 ### Rebuild

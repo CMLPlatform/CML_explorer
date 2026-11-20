@@ -12,6 +12,10 @@ Two ways to use a language model (settings in .env, next to this file or one fol
       LLM_API_KEY=...                              only for hosted OpenAI-compatible services
   Mistral (EU-based API, OpenAI-compatible):
       LLM_PROVIDER=mistral, MISTRAL_API_KEY=..., LLM_MODEL=mistral-medium-latest (default)
+  Hugging Face Inference Providers (OpenAI-compatible router; paid from the account's monthly credit):
+      LLM_PROVIDER=hf, HF_TOKEN=... (fine-grained token with "Make calls to Inference Providers"),
+      LLM_MODEL=openai/gpt-oss-120b:nebius (default; the suffix chooses the provider: Nebius, EU company, fast)
+      LLM_FALLBACK_MODEL=openai/gpt-oss-120b:ovhcloud (optional; used when LLM_MODEL fails: OVHcloud, France, slower)
   Claude:
       LLM_PROVIDER=anthropic, ANTHROPIC_API_KEY=..., LLM_MODEL=claude-sonnet-5-5 (default)
 
@@ -56,12 +60,14 @@ def load_env():
 load_env()
 PROVIDER = (os.environ.get("LLM_PROVIDER") or ("anthropic" if os.environ.get("ANTHROPIC_API_KEY") else
                                               "mistral" if os.environ.get("MISTRAL_API_KEY") else "local")).lower()
-DEFAULT_MODEL = {"anthropic": "claude-sonnet-5-5", "mistral": "mistral-medium-latest"}
-DEFAULT_URL = {"mistral": "https://api.mistral.ai/v1"}
+DEFAULT_MODEL = {"anthropic": "claude-sonnet-5-5", "mistral": "mistral-medium-latest", "hf": "openai/gpt-oss-120b:nebius"}
+DEFAULT_URL = {"mistral": "https://api.mistral.ai/v1", "hf": "https://router.huggingface.co/v1"}
+KEY_NAME = {"mistral": "MISTRAL_API_KEY", "hf": "HF_TOKEN"}   # where each hosted OpenAI-compatible service keeps its key
 MODEL = os.environ.get("LLM_MODEL") or os.environ.get("CML_ASSISTANT_MODEL") or DEFAULT_MODEL.get(PROVIDER, "")
+FALLBACK_MODEL = os.environ.get("LLM_FALLBACK_MODEL", "")   # same service, other model or provider
 BASE_URL = (os.environ.get("LLM_BASE_URL") or DEFAULT_URL.get(PROVIDER, "http://localhost:1234/v1")).rstrip("/")
 MODE = (os.environ.get("LLM_MODE") or ("retrieve" if PROVIDER == "local" else "agent")).lower()
-LLM_API_KEY = os.environ.get("LLM_API_KEY") or (os.environ.get("MISTRAL_API_KEY", "") if PROVIDER == "mistral" else "")
+LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get(KEY_NAME.get(PROVIDER, ""), "")
 MAX_STEPS = 8
 
 STOP = set("""a an and are as at be by can do does for from has have how i in into is it its me of on or our over
@@ -305,7 +311,7 @@ How to work:
   clearly which parts come from CML papers and which from your general knowledge.
 - Be clear about limits: you see abstracts, not full texts; recent papers may be missing; people who joined recently or
   have no ORCID may be under-represented.
-- Answer in the user's language. Be concise: a short overview, then the specifics. Use short paragraphs or a few bullets."""
+- Answer in the language of the user's last question (usually English). Be concise: a short overview, then the specifics. Use short paragraphs or a few bullets."""
 
 
 def _person_note(db, person_id, agent):
@@ -335,6 +341,7 @@ def _run_tool(db, name, args, person_id, steps, on_step):
 # ---------------------------------------------------------------- OpenAI-compatible servers (LM Studio, Ollama, vLLM, ...)
 
 def _http(method, path, body=None, timeout=600):
+    import urllib.error
     import urllib.request
     from urllib.parse import urlparse
     url = BASE_URL + path
@@ -345,8 +352,12 @@ def _http(method, path, body=None, timeout=600):
     host = urlparse(url).hostname or ""
     opener = (urllib.request.build_opener(urllib.request.ProxyHandler({}))   # never send local traffic through a proxy
               if host in ("localhost", "127.0.0.1", "::1") else urllib.request.build_opener())
-    with opener.open(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with opener.open(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:   # keep the service's own explanation, e.g. a missing token permission
+        detail = e.read().decode("utf-8", "replace")[:300].strip()
+        raise urllib.error.HTTPError(e.url, e.code, f"{e.reason} ({detail})" if detail else e.reason, e.headers, None) from None
 
 
 _local_model = None
@@ -370,7 +381,16 @@ def _openai_chat(messages, tools=None, max_tokens=1800):
     if tools:
         body["tools"] = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                            "parameters": t["input_schema"]}} for t in tools]
-    return _http("POST", "/chat/completions", body)["choices"][0]["message"]
+    if not FALLBACK_MODEL:
+        return _http("POST", "/chat/completions", body)["choices"][0]["message"]
+    import urllib.error
+    try:   # a shorter wait, so that the fallback still has time to answer
+        return _http("POST", "/chat/completions", body, timeout=90)["choices"][0]["message"]
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, KeyError) as e:
+        if isinstance(e, urllib.error.HTTPError) and e.code not in (429, 500, 502, 503, 504):
+            raise   # a problem with the key or the request: the fallback does not help
+        sys.stderr.write(f"{MODEL} failed ({type(e).__name__}: {e}); trying {FALLBACK_MODEL}\n")
+        return _http("POST", "/chat/completions", {**body, "model": FALLBACK_MODEL})["choices"][0]["message"]
 
 
 def _text(content):
@@ -417,6 +437,21 @@ def _agent_anthropic(db, messages, person_id, client, on_step):
     return answer, steps
 
 
+def _tool_args(raw):
+    """Tool-call arguments as a dict, or None if they cannot be read. Some providers (e.g. Nebius with gpt-oss)
+    drop the closing brace, so try to repair a cut-off JSON object before giving up."""
+    if isinstance(raw, dict):
+        return raw
+    raw = (raw or "").strip() or "{}"
+    for tail in ("", "}", '"}', "]}", '"]}'):
+        try:
+            args = json.loads(raw.rstrip(",") + tail)
+            return args if isinstance(args, dict) else None
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def _agent_openai(db, messages, person_id, on_step):
     convo = [{"role": "system", "content": SYSTEM + _person_note(db, person_id, True)}]
     convo += [{"role": m["role"], "content": m["content"]} for m in messages]
@@ -429,11 +464,9 @@ def _agent_openai(db, messages, person_id, on_step):
             answer = msg.get("content") or ""
             break
         for c in calls:
-            try:
-                args = json.loads(c["function"].get("arguments") or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            content = (_run_tool(db, c["function"]["name"], args, person_id, steps, on_step)
+            args = _tool_args(c["function"].get("arguments"))
+            content = (json.dumps({"error": "the arguments are not valid JSON: send them again as one JSON object"}) if args is None
+                       else _run_tool(db, c["function"]["name"], args, person_id, steps, on_step)
                        if c["function"]["name"] in TOOL_FUNCS else json.dumps({"error": "unknown tool"}))
             convo.append({"role": "tool", "tool_call_id": c.get("id", ""), "name": c["function"]["name"], "content": content})
     return _strip_thinking(answer), steps
@@ -452,7 +485,7 @@ Rules:
   position) and who contributes.
 - If the results do not answer the question, say so plainly and suggest a narrower or different question.
 - You only see abstracts. Do not present general knowledge as CML's work.
-- Be concise: a two-sentence overview, then the specifics in a few short bullets. Answer in the user's language."""
+- Be concise: a two-sentence overview, then the specifics in a few short bullets. Answer in the language of the user's last question (usually English)."""
 
 _COUNTRIES = None
 
@@ -594,10 +627,10 @@ def status():
     if PROVIDER == "anthropic":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             info.update(ready=False, problem="no ANTHROPIC_API_KEY in .env")
-    elif PROVIDER == "mistral":
+    elif PROVIDER in KEY_NAME:
         info["base_url"] = BASE_URL
         if not LLM_API_KEY:
-            info.update(ready=False, problem="no MISTRAL_API_KEY in .env")
+            info.update(ready=False, problem=f"no {KEY_NAME[PROVIDER]} in .env")
     else:
         info["base_url"] = BASE_URL
         try:

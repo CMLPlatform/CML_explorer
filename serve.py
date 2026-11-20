@@ -133,11 +133,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, out)
         except Exception as e:   # report the problem to the page instead of dropping the connection
             name = type(e).__name__
-            hint = (" Check ANTHROPIC_API_KEY in .env." if "Authentication" in name or "api_key" in str(e)
+            code = getattr(e, "code", None)   # HTTP status from the model service (urllib HTTPError)
+            hosted = assistant.PROVIDER != "local"
+            hint = (" The model service refuses to bill this request: check the credit and payment method of the account that owns the API key." if code == 402
+                    else " The model service does not accept the API key: check the key in .env or the Space secrets." if code in (401, 403)
+                    else " The model service gets too many requests: wait one minute and ask again." if code == 429
+                    else " The model service does not answer correctly: try again later." if hosted and name in ("TimeoutError", "HTTPError")
+                    else " Check ANTHROPIC_API_KEY in .env." if "Authentication" in name or "api_key" in str(e)
                     else f" Is the local model server running at {assistant.BASE_URL} with a model loaded?" if name in ("URLError", "ConnectionRefusedError", "RuntimeError")
                     else " The local model may be too slow or its context too short: in LM Studio set the context length to 8192 or more." if name in ("TimeoutError", "HTTPError")
                     else "")
             self._send(500, {"error": f"{name}: {e}.{hint}"})
+            sys.stderr.write(f"/api/ask failed: {name}: {e}\n")
 
     def log_message(self, fmt, *args):
         if "/api/ask" in (args[0] if args else ""):
