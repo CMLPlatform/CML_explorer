@@ -246,6 +246,12 @@
   .msg.bot p { margin:0 0 8px; } .msg.bot p:last-child { margin-bottom:0; }
   .msg.bot ul, .msg.bot ol { margin:4px 0 8px; padding-left:20px; }
   .msg.bot h4 { margin:10px 0 4px; font-size:13px; }
+  .msg.bot .tbl { overflow-x:auto; margin:6px 0 10px; }
+  .msg.bot table { border-collapse:collapse; font-size:12.5px; }
+  .msg.bot th, .msg.bot td { border:1px solid var(--line); padding:5px 8px; text-align:left; vertical-align:top; }
+  .msg.bot th { background:#f5f7fa; font-weight:600; }
+  .msg.bot hr { border:0; border-top:1px solid var(--line); margin:10px 0; }
+  .msg.bot code { background:#f2f2f2; padding:0 3px; border-radius:3px; font-size:12px; }
   .msg sup a { color:var(--accent); text-decoration:none; font-weight:600; padding:0 1px; }
   .msg .refs { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); font-size:12px; color:var(--mute); }
   .msg .refs ol { margin:0; padding-left:18px; } .msg .refs a { color:inherit; }
@@ -1503,20 +1509,34 @@ function mdToHtml(md, refs) {
   const num = new Map(refs.map((r, i) => [r.id, i + 1]));
   const names = people.map(p => p.name).sort((a, b) => b.length - a.length);
   const inline = t => {
-    let h = esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*]+)\*/g, "$1<i>$2</i>");
+    let h = esc(t).replace(/&lt;br\s*\/?&gt;/gi, "<br>").replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*\w])[*_]([^*_]+)[*_](?!\w)/g, "$1<i>$2</i>");
+    h = h.replace(/【([^】]*)】/g, (m, x) => (x.match(/W\d+/g) || []).map(w => `[${w}]`).join(""));
     h = h.replace(/\[(W\d+)\]/g, (m, id) => num.has(id) ? `<sup><a href="#ref-${id}" data-ref="${id}">${num.get(id)}</a></sup>` : "");
     h = h.replace(/<\/sup>\s*<sup>/g, "</sup><sup>,</sup><sup>");
     names.forEach(n => { const e = esc(n); if (h.includes(e)) h = h.split(e).join(`<button class="who" data-open="${esc(byName.get(n).id)}">${e}</button>`); });
     return h;
   };
-  const out = []; let list = null;
+  const out = []; let list = null, table = null;
+  const cells = line => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+  const endTable = () => { if (table) { out.push(`<div class="tbl"><table><thead><tr>${table.head.map(c => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${table.rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`); table = null; } };
   md.split(/\n/).forEach(line => {
+    if (/^\s*\|.*\|\s*$/.test(line)) {   // Markdown table row
+      if (list) { out.push(`</${list}>`); list = null; }
+      const c = cells(line);
+      if (c.every(x => /^:?-{2,}:?$/.test(x))) return;   // the |---|---| line under the header
+      if (!table) table = { head: c, rows: [] }; else table.rows.push(c);
+      return;
+    }
+    endTable();
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) { if (list) { out.push(`</${list}>`); list = null; } out.push("<hr>"); return; }
     const li = line.match(/^\s*(?:[-*•]|(\d+)\.)\s+(.*)/);
     if (li) { const tag = li[1] ? "ol" : "ul"; if (list !== tag) { if (list) out.push(`</${list}>`); out.push(`<${tag}>`); list = tag; } out.push(`<li>${inline(li[2])}</li>`); return; }
     if (list) { out.push(`</${list}>`); list = null; }
     const hd = line.match(/^#{1,4}\s+(.*)/);
     if (hd) out.push(`<h4>${inline(hd[1])}</h4>`); else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   });
+  endTable();
   if (list) out.push(`</${list}>`);
   return out.join("");
 }
@@ -1524,7 +1544,7 @@ const byName = new Map(people.map(p => [p.name, p]));
 function renderAsk() {
   checkApi().then(api => {
     $("askIntro").innerHTML = api
-      ? `<p class="pane-intro">Ask questions about CML research. The assistant searches the papers of current CML staff since 2010 (titles, abstracts, keywords from OpenAlex) and staff profiles, and cites the papers it uses. It sees abstracts, not full texts. Model: ${esc(api.model || "?")} (${({ anthropic: "Claude", mistral: "Mistral", local: "local" })[api.provider] || esc(api.provider)}, ${esc(api.mode)} mode)${api.problem ? ` · <b>${esc(api.problem)}</b>` : ""}.</p>
+      ? `<p class="pane-intro">Ask questions about CML research. The assistant searches the papers of current CML staff since 2010 (titles, abstracts, keywords from OpenAlex) and staff profiles, and cites the papers it uses. It sees abstracts, not full texts. Model: ${esc(api.model || "?")} (${({ anthropic: "Claude", mistral: "Mistral", hf: "Hugging Face", local: "local" })[api.provider] || esc(api.provider)}, ${esc(api.mode)} mode)${api.problem ? ` · <b>${esc(api.problem)}</b>` : ""}.</p>
          <div class="examples" style="margin-top:6px">Try: ${ASK_EXAMPLES.map(x => `<button type="button" class="chip" data-askq="${esc(x)}">${esc(x)}</button>`).join("")}</div>`
       : ASSISTANT_URL && !ASSISTANT_URL.startsWith("__") && location.protocol !== "file:"
       ? `<p class="pane-intro"><b>The online assistant does not answer.</b> After a quiet period it needs up to a minute to start. <button type="button" class="link" id="askRetry">Try again</button></p>`

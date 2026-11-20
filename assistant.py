@@ -311,7 +311,8 @@ How to work:
   clearly which parts come from CML papers and which from your general knowledge.
 - Be clear about limits: you see abstracts, not full texts; recent papers may be missing; people who joined recently or
   have no ORCID may be under-represented.
-- Answer in the language of the user's last question (usually English). Be concise: a short overview, then the specifics. Use short paragraphs or a few bullets."""
+- Answer in the language of the user's last question (usually English). Be concise: a short overview, then the specifics. Use short paragraphs or a few bullets.
+- Format: simple Markdown only (### headings, **bold**, bullet lists). No tables, no HTML tags such as <br>."""
 
 
 def _person_note(db, person_id, agent):
@@ -485,6 +486,7 @@ Rules:
   position) and who contributes.
 - If the results do not answer the question, say so plainly and suggest a narrower or different question.
 - You only see abstracts. Do not present general knowledge as CML's work.
+- Format: simple Markdown only (### headings, **bold**, bullet lists). No tables, no HTML tags such as <br>.
 - Be concise: a two-sentence overview, then the specifics in a few short bullets. Answer in the language of the user's last question (usually English)."""
 
 _COUNTRIES = None
@@ -594,7 +596,8 @@ def _retrieve(db, messages, person_id, client, on_step):
 # ---------------------------------------------------------------- entry points
 
 def _clean_citations(answer):
-    """Normalise the citation styles models produce: [W1, W2] / (W1) / [W1; W2] -> [W1][W2]."""
+    """Normalise the citation styles models produce: [W1, W2] / (W1) / [W1; W2] / 【W1】 (gpt-oss) -> [W1][W2]."""
+    answer = re.sub(r"【([^】]*)】", lambda m: "".join(f"[{w}]" for w in re.findall(r"W\d+", m.group(1))) or m.group(0), answer)
     answer = re.sub(r"\[((?:W\d+)(?:\s*[,;]\s*W\d+)+)\]", lambda m: "".join(f"[{w}]" for w in re.findall(r"W\d+", m.group(1))), answer)
     return re.sub(r"\((W\d+)\)", r"[\1]", answer)
 
